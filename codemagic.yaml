@@ -22,8 +22,8 @@ workflows:
       - name: Criar certificado e profile
         script: |
           keychain initialize
-          app-store-connect certificates create --type IOS_DISTRIBUTION --save || true
-          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
+          openssl genrsa -out /tmp/dist.key 2048
+          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --certificate-key @file:/tmp/dist.key --create
           keychain add-certificates
       - name: Instalar Pods
         script: |
