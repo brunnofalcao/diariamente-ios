@@ -6,9 +6,6 @@ workflows:
     integrations:
       app_store_connect: AppStoreConnectKey
     environment:
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: club.diariamente.app
       vars:
         BUNDLE_ID: "club.diariamente.app"
         XCODE_SCHEME: "App"
@@ -22,10 +19,16 @@ workflows:
         script: |
           npx cap add ios || true
           npx cap sync ios
+      - name: Criar certificado e profile
+        script: |
+          keychain initialize
+          app-store-connect certificates create --type IOS_DISTRIBUTION --save || true
+          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
+          keychain add-certificates
       - name: Instalar Pods
         script: |
           cd ios/App && pod install
-      - name: Aplicar assinatura no projeto
+      - name: Aplicar profile no projeto
         script: |
           xcode-project use-profiles
       - name: Build do ipa
