@@ -1,0 +1,13 @@
+{
+  "appId": "club.diariamente.app",
+  "appName": "Diariamente",
+  "webDir": "www",
+  "server": {
+    "url": "https://app.diariamente.club",
+    "cleartext": false
+  },
+  "ios": {
+    "contentInset": "always",
+    "backgroundColor": "#0A0E0E"
+  }
+}
