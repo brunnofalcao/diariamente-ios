@@ -19,6 +19,12 @@ workflows:
         script: |
           npx cap add ios || true
           npx cap sync ios
+      - name: Baixar icone oficial e gerar
+        script: |
+          mkdir -p assets
+          curl -L -o assets/icon.png "https://res.cloudinary.com/dlzrfhwin/image/upload/f_png,w_1024,h_1024,c_fill/v1776688513/iOs_Icon_-_Diariamente_8_ydzqht.png"
+          curl -L -o assets/splash.png "https://res.cloudinary.com/dlzrfhwin/image/upload/f_png,c_fit,w_900/c_pad,w_2732,h_2732,b_rgb:0A0E0E/v1776688513/iOs_Icon_-_Diariamente_8_ydzqht.png"
+          npx @capacitor/assets generate --ios
       - name: Criar certificado e profile
         script: |
           keychain initialize
@@ -31,7 +37,7 @@ workflows:
       - name: Aplicar profile no projeto
         script: |
           xcode-project use-profiles
-      - name: Definir build number (evita upload redundante)
+      - name: Definir build number
         script: |
           cd ios/App && agvtool new-version -all "$BUILD_NUMBER"
       - name: Build do ipa
