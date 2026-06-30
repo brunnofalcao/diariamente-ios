@@ -2,10 +2,7 @@
   "name": "diariamente-ios",
   "version": "1.0.0",
   "private": true,
-  "description": "Wrapper iOS nativo (Capacitor) do app Diariamente",
-  "scripts": {
-    "build": "echo 'O conteudo e servido ao vivo de app.diariamente.club (server.url no capacitor.config.json)'"
-  },
+  "scripts": { "build": "echo 'conteudo servido de app.diariamente.club'" },
   "dependencies": {
     "@capacitor/core": "^7.0.0",
     "@capacitor/ios": "^7.0.0",
@@ -13,6 +10,7 @@
     "@capacitor/splash-screen": "^7.0.0"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.0",
     "@capacitor/cli": "^7.0.0"
   }
 }
