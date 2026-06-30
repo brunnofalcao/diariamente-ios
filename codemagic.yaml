@@ -31,6 +31,9 @@ workflows:
       - name: Aplicar profile no projeto
         script: |
           xcode-project use-profiles
+      - name: Definir build number (evita upload redundante)
+        script: |
+          cd ios/App && agvtool new-version -all "$BUILD_NUMBER"
       - name: Build do ipa
         script: |
           xcode-project build-ipa --workspace "ios/App/App.xcworkspace" --scheme "$XCODE_SCHEME"
