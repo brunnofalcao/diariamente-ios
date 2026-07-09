@@ -24,23 +24,18 @@ workflows:
           set -e
           PLIST="ios/App/App/Info.plist"
           PBX="ios/App/App.xcodeproj/project.pbxproj"
-          # 1) Idioma principal do app = Portugues do Brasil (era 'en' por padrao do Capacitor)
           /usr/libexec/PlistBuddy -c "Set :CFBundleDevelopmentRegion pt-BR" "$PLIST" 2>/dev/null \
             || /usr/libexec/PlistBuddy -c "Add :CFBundleDevelopmentRegion string pt-BR" "$PLIST"
-          # 2) Localizacoes do bundle: Portugues apenas (remove English do binario)
           /usr/libexec/PlistBuddy -c "Delete :CFBundleLocalizations" "$PLIST" 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Add :CFBundleLocalizations array" "$PLIST"
           /usr/libexec/PlistBuddy -c "Add :CFBundleLocalizations:0 string pt-BR" "$PLIST"
           /usr/libexec/PlistBuddy -c "Add :CFBundleLocalizations:1 string pt" "$PLIST"
-          # 3) developmentRegion do projeto Xcode
           sed -i '' 's/developmentRegion = en;/developmentRegion = "pt-BR";/g' "$PBX"
-          # 4) InfoPlist.strings minimo em pt-BR (localizacao real registrada)
           mkdir -p "ios/App/App/pt-BR.lproj"
           printf '"CFBundleDisplayName" = "Diariamente";\n"CFBundleName" = "Diariamente";\n' > "ios/App/App/pt-BR.lproj/InfoPlist.strings"
           echo "=== CONFERENCIA DE IDIOMA ==="
           /usr/libexec/PlistBuddy -c "Print :CFBundleDevelopmentRegion" "$PLIST"
           /usr/libexec/PlistBuddy -c "Print :CFBundleLocalizations" "$PLIST"
-          grep -n "developmentRegion" "$PBX" || true
       - name: Baixar icone oficial e gerar
         script: |
           mkdir -p assets
@@ -59,9 +54,11 @@ workflows:
       - name: Aplicar profile no projeto
         script: |
           xcode-project use-profiles
-      - name: Definir build number (evita upload redundante)
+      - name: Definir versao (1.0.1) e build number
         script: |
-          cd ios/App && agvtool new-version -all "$BUILD_NUMBER"
+          cd ios/App
+          agvtool new-marketing-version 1.0.1
+          agvtool new-version -all "$BUILD_NUMBER"
       - name: Build do ipa
         script: |
           xcode-project build-ipa --workspace "ios/App/App.xcworkspace" --scheme "$XCODE_SCHEME"
