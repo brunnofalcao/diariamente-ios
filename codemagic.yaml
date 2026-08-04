@@ -64,10 +64,10 @@ workflows:
       - name: Aplicar profile no projeto
         script: |
           xcode-project use-profiles
-      - name: Definir versao (1.0.1) e build number
+      - name: Definir versao (1.0.2) e build number
         script: |
           cd ios/App
-          agvtool new-marketing-version 1.0.1
+          agvtool new-marketing-version 1.0.2
           agvtool new-version -all "$BUILD_NUMBER"
       - name: Build do ipa
         script: |
