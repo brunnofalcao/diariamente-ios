@@ -10,7 +10,15 @@
 		"contentInset": "always",
 		"backgroundColor": "#0A0E0E"
 	},
+	"plugins": {
+		"SplashScreen": {
+			"launchAutoHide": false,
+			"backgroundColor": "#0A0E0E",
+			"showSpinner": false
+		}
+	},
 	"packageClassList": [
+		"AppPlugin",
 		"PushNotificationsPlugin",
 		"SplashScreenPlugin"
 	]
