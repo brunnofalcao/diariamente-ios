@@ -45,12 +45,14 @@ workflows:
       - name: Baixar icone oficial e gerar
         script: |
           mkdir -p assets
-          # ÍCONE do app: continua o teal oficial.
+          # ÍCONE do app: teal oficial.
           curl -L -o assets/icon.png "https://res.cloudinary.com/dlzrfhwin/image/upload/f_png,w_1024,h_1024,c_fill/v1776688513/iOs_Icon_-_Diariamente_8_ydzqht.png"
-          # SPLASH: fundo escuro (#0A0E0E) + wordmark DIARIAMENTE (mesmo logo da tela de login web).
-          # Remove o bloco verde e emenda no splash web já existente — transição única e limpa.
-          # Logo PEQUENO (w_450) no centro do canvas 2732: o iPhone corta o quadrado pra tela,
-          # exibindo só ~1250px centrais — logo grande estoura. 450px = ~35% da largura visível.
+          # SPLASH — arte oficial única (SPLASH-DIARIAMENTE-001).
+          # Fonte da verdade: docs/SPLASH-DIARIAMENTE-001.md neste repositório.
+          # Esta arte alimenta a LaunchScreen, que é a ÚNICA splash do app. O web layer
+          # não desenha splash em plataforma nativa — não existe segunda arte pra "emendar".
+          # Canvas 2732x2732 com fundo #0A0E0E; o iPhone recorta ~1250px centrais, por isso
+          # o wordmark é gerado pequeno (~450px) para não estourar na tela.
           curl -L -o assets/splash.png "https://app.diariamente.club/splash-ios.png"
           npx @capacitor/assets generate --ios
       - name: Criar certificado e profile
