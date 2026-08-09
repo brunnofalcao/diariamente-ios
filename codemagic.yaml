@@ -66,10 +66,13 @@ workflows:
       - name: Aplicar profile no projeto
         script: |
           xcode-project use-profiles
-      - name: Definir versao (1.0.3) e build number
+      - name: Definir versao (1.0.4) e build number
         script: |
           cd ios/App
-          agvtool new-marketing-version 1.0.3
+          # 1.0.3 e a versao publicada. Toda submissao nova precisa de um numero
+          # de versao maior — bumpar aqui e o unico passo manual entre um release
+          # e o proximo. O BUILD_NUMBER o Codemagic incrementa sozinho.
+          agvtool new-marketing-version 1.0.4
           agvtool new-version -all "$BUILD_NUMBER"
       - name: Build do ipa
         script: |
