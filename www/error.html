@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Diariamente</title>
+<!--
+  TELA DE FALHA DE CARREGAMENTO (offline / servidor fora)
+
+  Carregada pelo Capacitor (server.errorPath) quando a WebView não consegue abrir
+  app.diariamente.club. Roda de capacitor://localhost, a partir do bundle.
+
+  Por isso ela é 100% self-contained: nenhuma fonte, imagem ou script remoto.
+  Qualquer dependência de rede aqui derrubaria justamente a tela que existe para
+  o caso de não haver rede.
+
+  Segue a SPLASH-DIARIAMENTE-001 no fundo e na cor, mas NÃO é uma splash: não tem
+  marca, não anima e não some sozinha. É interface real, com saída.
+-->
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%;
+    background: #0A0E0E;
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  }
+  main {
+    height: 100%;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 14px; padding: 32px;
+    padding-top: calc(32px + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px));
+    text-align: center;
+  }
+  h1 { margin: 0; font-size: 17px; font-weight: 700; color: #fff; }
+  p  { margin: 0; font-size: 14px; line-height: 1.5; color: rgba(255,255,255,.6); max-width: 300px; }
+  button {
+    margin-top: 8px; border: none; border-radius: 22px;
+    padding: 13px 30px; font-size: 14px; font-weight: 700;
+    font-family: inherit; background: #27BDBE; color: #06110F;
+  }
+  button:disabled { opacity: .5; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Sem conexão</h1>
+  <p>Não foi possível abrir o Diariamente agora. Confira sua internet e tente de novo.</p>
+  <button id="retry" type="button">Tentar novamente</button>
+</main>
+
+<script>
+(function () {
+  var APP = 'https://app.diariamente.club';
+  var btn = document.getElementById('retry');
+
+  // A splash nativa está segurada esperando o app chegar a READY — coisa que este
+  // documento nunca vai fazer. Solta ela agora, senão o usuário fica olhando a
+  // marca até o watchdog do AppDelegate estourar, sem ver esta tela.
+  try {
+    var P = window.Capacitor && window.Capacitor.Plugins;
+    if (P && P.SplashScreen && P.SplashScreen.hide) P.SplashScreen.hide({ fadeOutDuration: 250 });
+  } catch (_) {}
+
+  function retry() {
+    btn.disabled = true;
+    btn.textContent = 'Conectando…';
+    window.location.replace(APP);
+  }
+
+  btn.addEventListener('click', retry);
+
+  // Voltou a rede: reentra sozinho, sem o usuário precisar tocar em nada.
+  // É evento do sistema, não polling.
+  window.addEventListener('online', retry);
+})();
+</script>
+</body>
+</html>
