@@ -45,8 +45,7 @@ workflows:
       - name: Baixar icone oficial e gerar
         script: |
           mkdir -p assets
-          # ÍCONE do app: teal oficial.
-          curl -L -o assets/icon.png "https://res.cloudinary.com/dlzrfhwin/image/upload/f_png,w_1024,h_1024,c_fill/v1776688513/iOs_Icon_-_Diariamente_8_ydzqht.png"
+          # ÍCONE do app: vem de assets/icon.png commitado no repo (sem download externo).
           # SPLASH — arte oficial única (SPLASH-DIARIAMENTE-001).
           # Fonte da verdade: docs/SPLASH-DIARIAMENTE-001.md neste repositório.
           # Esta arte alimenta a LaunchScreen, que é a ÚNICA splash do app. O web layer
