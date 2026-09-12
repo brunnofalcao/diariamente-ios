@@ -68,7 +68,7 @@ workflows:
       - name: Definir versao (1.0.3) e build number
         script: |
           cd ios/App
-          agvtool new-marketing-version 1.0.3
+          agvtool new-marketing-version 1.0.5
           agvtool new-version -all "$BUILD_NUMBER"
       - name: Build do ipa
         script: |
