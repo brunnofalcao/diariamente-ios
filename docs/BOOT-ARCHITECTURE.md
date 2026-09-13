@@ -82,6 +82,30 @@ T6  READY → primeiro frame já na rota certa
 6. **Nenhum timer governa o caminho feliz.** Os únicos temporizadores no boot são
    guardas de falha declaradas: watchdog nativo (10 s) e o teto da bridge (2 s).
 
+## Quando não há rede
+
+O app é carregado ao vivo. Sem rede, a WebView **não chega a abrir o documento** —
+nenhum JavaScript roda, então a tela de erro do app web não tem como aparecer.
+(Service Worker não cobre esse caso: em WKWebView ele não é confiável sem
+`WKAppBoundDomains`, e com `server.url` remoto não dá para contar com ele.)
+
+Quem resolve é o Capacitor: `server.errorPath: "error.html"` carrega
+`www/error.html` do bundle quando a navegação falha
+(`didFailProvisionalNavigation`). A página é **100% self-contained** — nenhuma
+fonte, imagem ou script remoto, porque ela existe justamente para o caso de não
+haver rede. Ela também solta a splash nativa por conta própria: o boot nunca vai
+chegar a READY ali, e sem isso o usuário ficaria olhando a marca até o watchdog.
+
+Reentrada: botão *Tentar novamente* e o evento `online` do sistema — sem polling.
+
+Camadas, da mais específica para a última linha de defesa:
+
+| Situação | Quem trata | Resultado |
+|---|---|---|
+| Documento carrega, API falha | `bootIsNetworkFailure` no app web | "Sem conexão", sessão preservada |
+| Documento não carrega | `server.errorPath` → `www/error.html` | "Sem conexão", com retry automático |
+| Nada acima funcionou | Watchdog de 10 s no `AppDelegate` | Splash liberada; app não fica preso |
+
 ## Telemetria
 
 `console.log('[boot] …')` no web (visível no Safari Web Inspector) e `os_log`

@@ -52,7 +52,7 @@ workflows:
           # não desenha splash em plataforma nativa — não existe segunda arte pra "emendar".
           # Canvas 2732x2732 com fundo #0A0E0E; o iPhone recorta ~1250px centrais, por isso
           # o wordmark é gerado pequeno (~450px) para não estourar na tela.
-          curl -L -o assets/splash.png "https://app.diariamente.club/splash-ios.png"
+          curl -fL -o assets/splash.png "https://app.diariamente.club/splash-ios.png"
           npx @capacitor/assets generate --ios
       - name: Criar certificado e profile
         script: |
@@ -65,7 +65,7 @@ workflows:
       - name: Aplicar profile no projeto
         script: |
           xcode-project use-profiles
-      - name: Definir versao (1.0.3) e build number
+      - name: Definir versao (1.0.5) e build number
         script: |
           cd ios/App
           agvtool new-marketing-version 1.0.5
