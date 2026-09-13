@@ -46,7 +46,7 @@ DEPLOYMENT_TARGET   = '16.0'
 EMBED_PHASE_NAME    = 'Embed Foundation Extensions'
 PLUGINS_DST_SPEC    = Xcodeproj::Constants::COPY_FILES_BUILD_PHASE_DESTINATIONS[:plug_ins] # "13"
 APPEX_PRODUCT_TYPE  = Xcodeproj::Constants::PRODUCT_TYPE_UTI[:app_extension]              # com.apple.product-type.app-extension
-RESOURCE_EXTENSIONS = %w[.xcassets .strings .json .png .jpg .jpeg .txt].freeze
+RESOURCE_EXTENSIONS = %w[.xcassets .xcprivacy .strings .json .png .jpg .jpeg .txt].freeze
 
 DRY_RUN      = %w[1 true yes].include?(ENV['WIDGET_DRY_RUN'].to_s.downcase)
 ROOT         = File.expand_path(ENV['WIDGET_REPO_ROOT'] || (__dir__ ? File.join(__dir__, '..') : Dir.pwd))
