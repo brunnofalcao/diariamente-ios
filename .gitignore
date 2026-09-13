@@ -5,3 +5,4 @@ ios/App/Pods/
 DerivedData/
 *.log
 .DS_Store
+ios/App/DiariamenteWidget/
