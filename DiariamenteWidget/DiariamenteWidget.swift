@@ -55,6 +55,15 @@ enum FusoSP {
         return data.addingTimeInterval(24 * 60 * 60) // fallback defensivo
     }
 
+    /// "2026-09-22" no fuso de São Paulo — mesmo formato do campo `data` da API.
+    static func chaveDoDia(_ data: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = fuso
+        f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: data)
+    }
+
     /// "Sábado, 12 de setembro" — em pt-BR, no fuso de São Paulo.
     static func dataLonga(_ data: Date) -> String {
         let f = DateFormatter()
@@ -151,30 +160,32 @@ struct ProvocacaoEntry: TimelineEntry {
     let perguntaCurta: String
     let autor: String?
     let doCache: Bool     // true quando veio do cache por falha de rede
+    let desatualizado: Bool  // cache de um dia ANTERIOR: não pode se passar pela de hoje
 
     // Fabricas
     static func exemplo(date: Date) -> ProvocacaoEntry {
         let p = "O que você está adiando que caberia em dez minutos hoje?"
         return ProvocacaoEntry(date: date, estado: .provocacao, diaAno: 128,
-                               pergunta: p, perguntaCurta: p, autor: "Diariamente", doCache: false)
+                               pergunta: p, perguntaCurta: p, autor: "Diariamente",
+                               doCache: false, desatualizado: false)
     }
 
-    static func deItem(_ item: ProvocacaoSalva, date: Date, doCache: Bool) -> ProvocacaoEntry {
+    static func deItem(_ item: ProvocacaoSalva, date: Date, doCache: Bool, desatualizado: Bool = false) -> ProvocacaoEntry {
         ProvocacaoEntry(date: date, estado: .provocacao, diaAno: item.diaAno,
                         pergunta: item.pergunta, perguntaCurta: item.perguntaCurta,
-                        autor: item.autor, doCache: doCache)
+                        autor: item.autor, doCache: doCache, desatualizado: desatualizado)
     }
 
     static func vazio(date: Date) -> ProvocacaoEntry {
-        ProvocacaoEntry(date: date, estado: .vazio, diaAno: nil, pergunta: "", perguntaCurta: "", autor: nil, doCache: false)
+        ProvocacaoEntry(date: date, estado: .vazio, diaAno: nil, pergunta: "", perguntaCurta: "", autor: nil, doCache: false, desatualizado: false)
     }
 
     static func semConexao(date: Date) -> ProvocacaoEntry {
-        ProvocacaoEntry(date: date, estado: .semConexao, diaAno: nil, pergunta: "", perguntaCurta: "", autor: nil, doCache: false)
+        ProvocacaoEntry(date: date, estado: .semConexao, diaAno: nil, pergunta: "", perguntaCurta: "", autor: nil, doCache: false, desatualizado: false)
     }
 
     static func virada(em date: Date) -> ProvocacaoEntry {
-        ProvocacaoEntry(date: date, estado: .virada, diaAno: nil, pergunta: "", perguntaCurta: "", autor: nil, doCache: false)
+        ProvocacaoEntry(date: date, estado: .virada, diaAno: nil, pergunta: "", perguntaCurta: "", autor: nil, doCache: false, desatualizado: false)
     }
 }
 
@@ -184,6 +195,8 @@ extension ProvocacaoEntry {
     var rotuloDia: String {
         switch estado {
         case .provocacao:
+            // Um cache de ontem não pode exibir "Dia 128" como se fosse o de hoje.
+            if desatualizado { return "Última salva" }
             if let n = diaAno { return "Dia " + String(n) }
             return "Hoje"
         case .vazio:       return "Hoje"
@@ -226,6 +239,7 @@ extension ProvocacaoEntry {
     /// Linha do autor (só no estado com conteúdo). Marca "offline" quando veio do cache.
     var linhaAutor: String? {
         guard estado == .provocacao, let a = autor, !a.isEmpty else { return nil }
+        if desatualizado { return a + " · não é a de hoje" }
         return doCache ? a + " · offline" : a
     }
 
@@ -254,7 +268,9 @@ extension ProvocacaoEntry {
 
     var subtituloGrande: String {
         switch estado {
-        case .provocacao:  return doCache ? "Sem conexão · mostrando a última salva." : "Leia, reflita e registre uma ação concreta."
+        case .provocacao:
+            if desatualizado { return "Sem conexão — esta não é a provocação de hoje." }
+            return doCache ? "Sem conexão · mostrando a última salva." : "Leia, reflita e registre uma ação concreta."
         case .vazio:       return "Volte mais tarde ou abra o app."
         case .semConexao:  return "Toque para tentar de novo no app."
         case .virada:      return "O widget atualiza em instantes."
@@ -282,11 +298,19 @@ enum WidgetAPI {
 
     static let endpoint = URL(string: "https://app.diariamente.club/api/widget/today")
 
-    static func buscar(_ completion: @escaping (Resultado) -> Void) {
+    /// `ignorandoCache` serve para a retentativa: quando o widget está sem o conteúdo
+    /// de hoje, consultar o cache local é inútil — é justamente ele que pode estar
+    /// segurando a resposta errada.
+    static func buscar(ignorandoCache: Bool = false, _ completion: @escaping (Resultado) -> Void) {
         guard let url = endpoint else { completion(.falha); return }
         var req = URLRequest(url: url)
-        req.cachePolicy = .reloadIgnoringLocalCacheData
-        req.timeoutInterval = 15
+        // O servidor expira o Cache-Control exatamente na virada do dia em São Paulo,
+        // então honrar o cache local é seguro no caminho normal e evita um round-trip
+        // completo a cada recarga.
+        req.cachePolicy = ignorandoCache ? .reloadIgnoringLocalCacheData : .useProtocolCachePolicy
+        // Extensão de widget tem orçamento curto de execução: 15s é tempo demais
+        // para ficar pendurado antes de cair no cache.
+        req.timeoutInterval = 10
         req.setValue("application/json", forHTTPHeaderField: "Accept")
 
         let tarefa = URLSession.shared.dataTask(with: req) { dados, resposta, erro in
@@ -307,8 +331,17 @@ enum WidgetAPI {
 
 // Junta rede + cache e devolve sempre UMA entrada (nunca falha).
 enum Carregador {
-    static func carregar(agora: Date, completion: @escaping (ProvocacaoEntry) -> Void) {
-        WidgetAPI.buscar { resultado in
+    /// A data do corpo bate com hoje em São Paulo? Corpo sem data é tratado como atual
+    /// numa resposta ao vivo (é a resposta corrente da API, por definição) e como
+    /// suspeito quando vem do cache local, que por natureza pode ser antigo.
+    private static func ehDeHoje(_ dataDoCorpo: String?, agora: Date, vindoDoCache: Bool) -> Bool {
+        let d = (dataDoCorpo ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if d.isEmpty { return !vindoDoCache }
+        return d == FusoSP.chaveDoDia(agora)
+    }
+
+    static func carregar(agora: Date, ignorandoCache: Bool = false, completion: @escaping (ProvocacaoEntry) -> Void) {
+        WidgetAPI.buscar(ignorandoCache: ignorandoCache) { resultado in
             switch resultado {
             case .sucesso(let r):
                 let perguntaLimpa = (r.pergunta ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -326,12 +359,21 @@ enum Carregador {
                                            autor: autorLimpo.isEmpty ? nil : autorLimpo,
                                            salvaEm: agora)
                 CacheProvocacao.salvar(item)
-                completion(.deItem(item, date: agora, doCache: false))
+                // Um 200 NÃO garante que o corpo é de hoje: o URLCache do aparelho ou a
+                // borda do Railway podem devolver uma resposta ainda "fresca" gravada
+                // antes da virada. Sem esta conferência o widget exibiria a provocação de
+                // ontem sem marca nenhuma — e, como a recarga é diária, ficaria assim até
+                // a meia-noite seguinte.
+                let doDia = ehDeHoje(r.data, agora: agora, vindoDoCache: false)
+                completion(.deItem(item, date: agora, doCache: false, desatualizado: !doDia))
 
             case .falha:
-                // Erro de rede: último valor em cache, se houver.
+                // Erro de rede: último valor em cache, se houver — mas conferindo a data.
+                // Sem esta checagem o widget exibia a provocação de ONTEM com o rótulo
+                // "Dia N" de ontem, como se fosse a de hoje.
                 if let item = CacheProvocacao.ler() {
-                    completion(.deItem(item, date: agora, doCache: true))
+                    let doDia = ehDeHoje(item.data, agora: agora, vindoDoCache: true)
+                    completion(.deItem(item, date: agora, doCache: true, desatualizado: !doDia))
                 } else {
                     completion(.semConexao(date: agora))
                 }
@@ -340,7 +382,7 @@ enum Carregador {
     }
 }
 
-// MARK: - Provider (timeline: agora + próxima meia-noite; recarga em até 6h)
+// MARK: - Provider (timeline: agora + próxima meia-noite; UMA recarga por dia)
 
 struct ProvocacaoProvider: TimelineProvider {
     typealias Entry = ProvocacaoEntry
@@ -358,14 +400,48 @@ struct ProvocacaoProvider: TimelineProvider {
         Carregador.carregar(agora: agora) { completion($0) }
     }
 
+    /// Desvio estável por instalação, sorteado uma única vez e guardado.
+    /// Sem ele, todo aparelho com o widget bateria no servidor no mesmo segundo da
+    /// virada. Não pode ser sorteado a cada chamada: a timeline tem que ser estável.
+    /// Janela curta de propósito: enquanto a recarga não chega, o widget mostra
+    /// "Novo dia" SEM conteúdo. Espalhar em 30 min condenaria metade das instalações
+    /// a meia hora de widget vazio toda madrugada, para sempre — o desvio é sorteado
+    /// uma vez e fica. Três minutos bastam para não bater todo mundo no mesmo segundo.
+    private static let janelaDeDesvio = 3 * 60
+    private static var desvioDaRecarga: TimeInterval {
+        let chave = "club.diariamente.widget.desvioRecarga.v2"
+        let d = UserDefaults.standard
+        if let v = d.object(forKey: chave) as? Int { return TimeInterval(v) }
+        let v = Int.random(in: 0..<janelaDeDesvio)
+        d.set(v, forKey: chave)
+        return TimeInterval(v)
+    }
+
     func getTimeline(in context: Context, completion: @escaping (Timeline<ProvocacaoEntry>) -> Void) {
         let agora = Date()
-        Carregador.carregar(agora: agora) { entradaAgora in
+        // Uma recarga pedida logo após a virada tem que atravessar o cache local:
+        // ele é justamente quem pode estar segurando a resposta do dia anterior.
+        let logoAposAVirada = agora.timeIntervalSince(FusoSP.calendario.startOfDay(for: agora)) < 60 * 60
+        Carregador.carregar(agora: agora, ignorandoCache: logoAposAVirada) { entradaAgora in
             let meiaNoite = FusoSP.proximaMeiaNoite(depoisDe: agora)
             let entradaVirada = ProvocacaoEntry.virada(em: meiaNoite)
-            // Recarrega logo após a meia-noite ou em 6h — o que vier primeiro.
-            let seisHoras = agora.addingTimeInterval(6 * 60 * 60)
-            let recarga = min(meiaNoite.addingTimeInterval(2 * 60), seisHoras)
+
+            // O conteúdo muda UMA vez por dia, à meia-noite de Brasília. A versão
+            // anterior pedia recarga a cada 6h além da virada: 3 chamadas de rede
+            // inúteis por dia, por widget instalado. O iOS dá um orçamento limitado
+            // de atualizações por widget — gastá-lo à toa é o que faz o widget parar
+            // de atualizar e ficar velho ou em branco.
+            var recarga = meiaNoite.addingTimeInterval(60 + Self.desvioDaRecarga)
+
+            // Exceção: se esta busca não trouxe o conteúdo de HOJE, não faz sentido
+            // esperar até a próxima meia-noite para tentar de novo.
+            // A condição é sobre o conteúdo estar certo, não sobre a origem: um cache
+            // com a provocação de hoje não precisa de retentativa nenhuma, e uma
+            // resposta 200 com o corpo de ontem precisa — era o inverso disso antes.
+            if entradaAgora.estado != .provocacao || entradaAgora.desatualizado {
+                recarga = min(recarga, agora.addingTimeInterval(30 * 60))
+            }
+
             completion(Timeline(entries: [entradaAgora, entradaVirada], policy: .after(recarga)))
         }
     }
