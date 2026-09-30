@@ -6,8 +6,14 @@
 //    símbolo 2a · "Dia N" · provocação do dia · autor · CTA curto.
 //  Ritmo do dia, ofensiva e próxima ação ficam para a FASE 2 (App Group + bridge).
 //
-//  Fonte de dados: GET https://app.diariamente.club/api/widget/today (público, sem login)
+//  Fonte de dados: GET https://app.diariamente.club/api/widget/today?lang=<pt-BR|es>
+//  (público, sem login)
 //  Resposta: { ok, vazio, data, day_id, dia_ano, pergunta, pergunta_curta, autor, autor_raw }
+//  Sem conteúdo no idioma pedido: { ok: true, vazio: true, data, pergunta: null, autor: null }
+//
+//  Idioma: o widget não enxerga a conta (sem App Group), então segue o idioma
+//  preferido do APARELHO — espanhol se o primeiro idioma for "es", senão pt-BR.
+//  Conteúdo, textos fixos, datas e cache local saem todos nesse mesmo idioma.
 //
 //  Compatibilidade:
 //    - Alvo do target: iOS 16 (compila também com alvo 15).
@@ -38,10 +44,11 @@ enum DiarCor {
 enum FusoSP {
     static let fuso: TimeZone = TimeZone(identifier: "America/Sao_Paulo") ?? TimeZone.current
 
+    /// Só para aritmética de datas (início do dia, +1 dia) — o locale não interfere
+    /// nessas contas. O texto por extenso sai em `dataLonga`, no idioma do widget.
     static var calendario: Calendar {
         var c = Calendar(identifier: .gregorian)
         c.timeZone = fuso
-        c.locale = Locale(identifier: "pt_BR")
         return c
     }
 
@@ -64,12 +71,13 @@ enum FusoSP {
         return f.string(from: data)
     }
 
-    /// "Sábado, 12 de setembro" — em pt-BR, no fuso de São Paulo.
-    static func dataLonga(_ data: Date) -> String {
+    /// "Sábado, 12 de setembro" / "Sábado, 12 de septiembre" — no idioma do widget,
+    /// sempre no fuso de São Paulo (é nele que o conteúdo vira).
+    static func dataLonga(_ data: Date, idioma: Idioma) -> String {
         let f = DateFormatter()
-        f.locale = Locale(identifier: "pt_BR")
+        f.locale = idioma.localeDatas
         f.timeZone = fuso
-        f.dateFormat = "EEEE, d 'de' MMMM"
+        f.dateFormat = idioma.textos.formatoDataLonga
         return capitalizarInicial(f.string(from: data))
     }
 
@@ -77,6 +85,169 @@ enum FusoSP {
         guard let primeira = s.first else { return s }
         return String(primeira).uppercased() + String(s.dropFirst())
     }
+}
+
+// MARK: - Idioma (pt-BR ou es)
+
+enum Idioma: String {
+    case pt = "pt-BR"   // rawValue = valor do ?lang= que o servidor aceita
+    case es = "es"
+
+    /// "es", "es-MX", "es-419", "es_ES" → .es; "pt", "pt-BR", "pt_PT" → .pt; resto → nil.
+    /// Compara o código de idioma inteiro (antes do "-"/"_"), não um prefixo solto.
+    init?(codigo: String) {
+        let base = codigo.split(whereSeparator: { $0 == "-" || $0 == "_" }).first
+        switch base.map({ $0.lowercased() }) {
+        case "es": self = .es
+        case "pt": self = .pt
+        default:   return nil
+        }
+    }
+
+    /// O widget não tem acesso à conta (sem App Group): vale o primeiro idioma
+    /// preferido do aparelho. `Locale.preferredLanguages` e não
+    /// `Bundle.main.preferredLocalizations` — a extensão só declara pt-BR, então o
+    /// bundle resolveria sempre pt. Qualquer idioma que não seja espanhol fica em
+    /// pt-BR, a língua de origem do conteúdo.
+    static var doAparelho: Idioma {
+        guard let primeiro = Locale.preferredLanguages.first else { return .pt }
+        return Idioma(codigo: primeiro) == .es ? .es : .pt
+    }
+
+    var localeDatas: Locale { Locale(identifier: self == .es ? "es" : "pt_BR") }
+
+    var textos: TextosWidget { self == .es ? .es : .pt }
+}
+
+/// Textos fixos do widget, um conjunto por idioma. Dicionário em código e não
+/// Localizable.strings: o alvo é montado por script (add_widget_target.rb, sem
+/// pastas .lproj) e o idioma é escolhido pelo próprio widget, não pelo bundle.
+/// Struct com `let` em vez de [String: String]: esquecer uma tradução não compila.
+struct TextosWidget {
+    // Rótulos curtos (kicker, "Dia N", Lock Screen)
+    let dia: String
+    let hoje: String
+    let ultimaSalva: String
+    let semConexao: String
+    let novoDia: String
+    let provocacao: String
+    // Texto principal por estado (média/grande) e versão curta (pequena/Lock Screen)
+    let longoVazio: String
+    let longoSemConexao: String
+    let longoVirada: String
+    let curtoVazio: String
+    let curtoSemConexao: String
+    let curtoVirada: String
+    // Complemento da linha do autor
+    let autorOffline: String
+    let autorNaoEHoje: String
+    // Chamadas para abrir o app
+    let ctaProvocacao: String
+    let ctaVazio: String
+    let ctaSemConexao: String
+    let ctaVirada: String
+    let ctaCurto: String
+    let ctaLer: String
+    // Família grande
+    let tituloProvocacao: String
+    let tituloVazio: String
+    let subtituloProvocacao: String
+    let subtituloOffline: String
+    let subtituloDesatualizado: String
+    let subtituloVazio: String
+    let subtituloSemConexao: String
+    let subtituloVirada: String
+    // Lock Screen em linha única
+    let inlineVazio: String
+    let inlineSemConexao: String
+    let inlineVirada: String
+    // Galeria de widgets (nome, descrição e exemplo da prévia)
+    let nomeWidget: String
+    let descricaoWidget: String
+    let exemploPergunta: String
+    // Data por extenso do cabeçalho da família grande
+    let formatoDataLonga: String
+
+    static let pt = TextosWidget(
+        dia: "Dia",
+        hoje: "Hoje",
+        ultimaSalva: "Última salva",
+        semConexao: "Sem conexão",
+        novoDia: "Novo dia",
+        provocacao: "Provocação",
+        longoVazio: "A provocação de hoje ainda não foi publicada.",
+        longoSemConexao: "Não foi possível carregar a provocação de hoje.",
+        longoVirada: "Um novo dia começou. A provocação de hoje já está no app.",
+        curtoVazio: "Ainda sem provocação hoje.",
+        curtoSemConexao: "Sem conexão. Abra o app.",
+        curtoVirada: "A provocação de hoje já está no app.",
+        autorOffline: "offline",
+        autorNaoEHoje: "não é a de hoje",
+        ctaProvocacao: "Abrir para concluir o dia",
+        ctaVazio: "Abrir o app",
+        ctaSemConexao: "Tentar no app",
+        ctaVirada: "Abrir para ler",
+        ctaCurto: "Abrir",
+        ctaLer: "Ler",
+        tituloProvocacao: "Provocação de hoje",
+        tituloVazio: "Ainda sem provocação",
+        subtituloProvocacao: "Leia, reflita e registre uma ação concreta.",
+        subtituloOffline: "Sem conexão · mostrando a última salva.",
+        subtituloDesatualizado: "Sem conexão — esta não é a provocação de hoje.",
+        subtituloVazio: "Volte mais tarde ou abra o app.",
+        subtituloSemConexao: "Toque para tentar de novo no app.",
+        subtituloVirada: "O widget atualiza em instantes.",
+        inlineVazio: "Diariamente · sem provocação hoje",
+        inlineSemConexao: "Diariamente · sem conexão",
+        inlineVirada: "Diariamente · novo dia",
+        nomeWidget: "Provocação de Hoje",
+        descricaoWidget: "O símbolo, o dia e a provocação do Diariamente na sua tela.",
+        exemploPergunta: "O que você está adiando que caberia em dez minutos hoje?",
+        formatoDataLonga: "EEEE, d 'de' MMMM"
+    )
+
+    // Em espanhol o vazio é o estado normal enquanto não houver provocações em es:
+    // ele diz que o conteúdo vem no idioma da pessoa, e nunca cai para o português.
+    // Pelo mesmo motivo a virada não promete "já está no app" — pode não estar.
+    // Vocabulário alinhado ao app web (public/i18n/es.json, repositório diariamente):
+    // "Provocación de hoy", "Día N", "Sin conexión", "la app", "completar".
+    static let es = TextosWidget(
+        dia: "Día",
+        hoje: "Hoy",
+        ultimaSalva: "Última guardada",
+        semConexao: "Sin conexión",
+        novoDia: "Nuevo día",
+        provocacao: "Provocación",
+        longoVazio: "La provocación del día llega pronto en tu idioma.",
+        longoSemConexao: "No se pudo cargar la provocación de hoy.",
+        longoVirada: "Empezó un nuevo día.",
+        curtoVazio: "Pronto en tu idioma.",
+        curtoSemConexao: "Sin conexión. Abre la app.",
+        curtoVirada: "Empezó un nuevo día.",
+        autorOffline: "sin conexión",
+        autorNaoEHoje: "no es la de hoy",
+        ctaProvocacao: "Abrir para completar el día",
+        ctaVazio: "Abrir la app",
+        ctaSemConexao: "Intentar en la app",
+        ctaVirada: "Abrir la app",
+        ctaCurto: "Abrir",
+        ctaLer: "Leer",
+        tituloProvocacao: "Provocación de hoy",
+        tituloVazio: "Pronto en tu idioma",
+        subtituloProvocacao: "Lee, reflexiona y registra una acción concreta.",
+        subtituloOffline: "Sin conexión · mostrando la última guardada.",
+        subtituloDesatualizado: "Sin conexión — esta no es la provocación de hoy.",
+        subtituloVazio: "Vuelve más tarde o abre la app.",
+        subtituloSemConexao: "Toca para intentarlo de nuevo en la app.",
+        subtituloVirada: "El widget se actualiza en instantes.",
+        inlineVazio: "Diariamente · pronto en tu idioma",
+        inlineSemConexao: "Diariamente · sin conexión",
+        inlineVirada: "Diariamente · nuevo día",
+        nomeWidget: "Provocación de Hoy",
+        descricaoWidget: "El símbolo, el día y la provocación de Diariamente en tu pantalla.",
+        exemploPergunta: "¿Qué estás posponiendo que cabría en diez minutos hoy?",
+        formatoDataLonga: "EEEE, d 'de' MMMM"
+    )
 }
 
 // MARK: - Resposta da API (todos os campos opcionais e tolerantes a tipo)
@@ -89,9 +260,10 @@ struct WidgetResponse: Decodable {
     let pergunta: String?
     let perguntaCurta: String?
     let autor: String?
+    let lang: String?          // o servidor hoje NÃO devolve; se um dia ecoar, é conferido
 
     private enum Chaves: String, CodingKey {
-        case ok, vazio, data, pergunta, autor
+        case ok, vazio, data, pergunta, autor, lang
         case diaAno = "dia_ano"
         case perguntaCurta = "pergunta_curta"
     }
@@ -104,6 +276,7 @@ struct WidgetResponse: Decodable {
         pergunta = try? c.decodeIfPresent(String.self, forKey: .pergunta)
         perguntaCurta = try? c.decodeIfPresent(String.self, forKey: .perguntaCurta)
         autor = try? c.decodeIfPresent(String.self, forKey: .autor)
+        lang = try? c.decodeIfPresent(String.self, forKey: .lang)
 
         // dia_ano pode chegar como Int, Double ou String — nunca derruba o decode.
         if let n = try? c.decodeIfPresent(Int.self, forKey: .diaAno) {
@@ -127,19 +300,30 @@ struct ProvocacaoSalva: Codable {
     let perguntaCurta: String
     let autor: String?
     let salvaEm: Date
+    let idioma: String?        // rawValue de Idioma; nil = gravado antes do suporte a es (era pt)
 }
 
+/// Um cache POR IDIOMA: trocar o idioma do aparelho e ficar sem rede não pode exibir
+/// a última provocação do outro idioma. O pt mantém a chave antiga, então quem já
+/// tem o widget instalado não perde o cache na atualização (tudo o que foi gravado
+/// antes desta versão era pt).
 enum CacheProvocacao {
-    private static let chave = "club.diariamente.widget.ultimaProvocacao.v1"
-
-    static func salvar(_ item: ProvocacaoSalva) {
-        guard let dados = try? JSONEncoder().encode(item) else { return }
-        UserDefaults.standard.set(dados, forKey: chave)
+    private static func chave(_ idioma: Idioma) -> String {
+        let base = "club.diariamente.widget.ultimaProvocacao.v1"
+        return idioma == .pt ? base : base + "." + idioma.rawValue
     }
 
-    static func ler() -> ProvocacaoSalva? {
-        guard let dados = UserDefaults.standard.data(forKey: chave) else { return nil }
-        return try? JSONDecoder().decode(ProvocacaoSalva.self, from: dados)
+    static func salvar(_ item: ProvocacaoSalva, idioma: Idioma) {
+        guard let dados = try? JSONEncoder().encode(item) else { return }
+        UserDefaults.standard.set(dados, forKey: chave(idioma))
+    }
+
+    static func ler(idioma: Idioma) -> ProvocacaoSalva? {
+        guard let dados = UserDefaults.standard.data(forKey: chave(idioma)),
+              let item = try? JSONDecoder().decode(ProvocacaoSalva.self, from: dados) else { return nil }
+        // A chave já separa os idiomas; conferir o campo gravado é a segunda trava.
+        guard (item.idioma ?? Idioma.pt.rawValue) == idioma.rawValue else { return nil }
+        return item
     }
 }
 
@@ -161,60 +345,66 @@ struct ProvocacaoEntry: TimelineEntry {
     let autor: String?
     let doCache: Bool     // true quando veio do cache por falha de rede
     let desatualizado: Bool  // cache de um dia ANTERIOR: não pode se passar pela de hoje
+    // Idioma em que o conteúdo foi buscado. As views tiram os textos fixos DAQUI, e
+    // não do aparelho no momento do desenho: rótulo e provocação saem sempre na
+    // mesma língua, mesmo que o idioma mude entre a busca e a próxima recarga.
+    let idioma: Idioma
+
+    var t: TextosWidget { idioma.textos }
 
     // Fabricas
-    static func exemplo(date: Date) -> ProvocacaoEntry {
-        let p = "O que você está adiando que caberia em dez minutos hoje?"
+    static func exemplo(date: Date, idioma: Idioma) -> ProvocacaoEntry {
+        let p = idioma.textos.exemploPergunta
         return ProvocacaoEntry(date: date, estado: .provocacao, diaAno: 128,
                                pergunta: p, perguntaCurta: p, autor: "Diariamente",
-                               doCache: false, desatualizado: false)
+                               doCache: false, desatualizado: false, idioma: idioma)
     }
 
-    static func deItem(_ item: ProvocacaoSalva, date: Date, doCache: Bool, desatualizado: Bool = false) -> ProvocacaoEntry {
+    static func deItem(_ item: ProvocacaoSalva, date: Date, idioma: Idioma, doCache: Bool, desatualizado: Bool = false) -> ProvocacaoEntry {
         ProvocacaoEntry(date: date, estado: .provocacao, diaAno: item.diaAno,
                         pergunta: item.pergunta, perguntaCurta: item.perguntaCurta,
-                        autor: item.autor, doCache: doCache, desatualizado: desatualizado)
+                        autor: item.autor, doCache: doCache, desatualizado: desatualizado, idioma: idioma)
     }
 
-    static func vazio(date: Date) -> ProvocacaoEntry {
-        ProvocacaoEntry(date: date, estado: .vazio, diaAno: nil, pergunta: "", perguntaCurta: "", autor: nil, doCache: false, desatualizado: false)
+    static func vazio(date: Date, idioma: Idioma) -> ProvocacaoEntry {
+        ProvocacaoEntry(date: date, estado: .vazio, diaAno: nil, pergunta: "", perguntaCurta: "", autor: nil, doCache: false, desatualizado: false, idioma: idioma)
     }
 
-    static func semConexao(date: Date) -> ProvocacaoEntry {
-        ProvocacaoEntry(date: date, estado: .semConexao, diaAno: nil, pergunta: "", perguntaCurta: "", autor: nil, doCache: false, desatualizado: false)
+    static func semConexao(date: Date, idioma: Idioma) -> ProvocacaoEntry {
+        ProvocacaoEntry(date: date, estado: .semConexao, diaAno: nil, pergunta: "", perguntaCurta: "", autor: nil, doCache: false, desatualizado: false, idioma: idioma)
     }
 
-    static func virada(em date: Date) -> ProvocacaoEntry {
-        ProvocacaoEntry(date: date, estado: .virada, diaAno: nil, pergunta: "", perguntaCurta: "", autor: nil, doCache: false, desatualizado: false)
+    static func virada(em date: Date, idioma: Idioma) -> ProvocacaoEntry {
+        ProvocacaoEntry(date: date, estado: .virada, diaAno: nil, pergunta: "", perguntaCurta: "", autor: nil, doCache: false, desatualizado: false, idioma: idioma)
     }
 }
 
 // Textos de apresentação por estado (uma única fonte para todas as famílias).
 extension ProvocacaoEntry {
-    /// "Dia 128" / "Hoje" / "Sem conexão" / "Novo dia"
+    /// "Dia 128" / "Hoje" / "Sem conexão" / "Novo dia" (ou "Día 128" / "Hoy" / … em es)
     var rotuloDia: String {
         switch estado {
         case .provocacao:
             // Um cache de ontem não pode exibir "Dia 128" como se fosse o de hoje.
-            if desatualizado { return "Última salva" }
-            if let n = diaAno { return "Dia " + String(n) }
-            return "Hoje"
-        case .vazio:       return "Hoje"
-        case .semConexao:  return "Sem conexão"
-        case .virada:      return "Novo dia"
+            if desatualizado { return t.ultimaSalva }
+            if let n = diaAno { return t.dia + " " + String(n) }
+            return t.hoje
+        case .vazio:       return t.hoje
+        case .semConexao:  return t.semConexao
+        case .virada:      return t.novoDia
         }
     }
 
     /// Kicker da família média: "Provocação · Dia 128"
-    var kicker: String { "Provocação · " + rotuloDia }
+    var kicker: String { t.provocacao + " · " + rotuloDia }
 
     /// Texto principal (citação com aspas tipográficas ou mensagem de estado).
     var textoLongo: String {
         switch estado {
         case .provocacao:  return "\u{201C}" + pergunta + "\u{201D}"
-        case .vazio:       return "A provocação de hoje ainda não foi publicada."
-        case .semConexao:  return "Não foi possível carregar a provocação de hoje."
-        case .virada:      return "Um novo dia começou. A provocação de hoje já está no app."
+        case .vazio:       return t.longoVazio
+        case .semConexao:  return t.longoSemConexao
+        case .virada:      return t.longoVirada
         }
     }
 
@@ -230,50 +420,50 @@ extension ProvocacaoEntry {
     var textoCurto: String {
         switch estado {
         case .provocacao:  return perguntaCurta
-        case .vazio:       return "Ainda sem provocação hoje."
-        case .semConexao:  return "Sem conexão. Abra o app."
-        case .virada:      return "A provocação de hoje já está no app."
+        case .vazio:       return t.curtoVazio
+        case .semConexao:  return t.curtoSemConexao
+        case .virada:      return t.curtoVirada
         }
     }
 
     /// Linha do autor (só no estado com conteúdo). Marca "offline" quando veio do cache.
     var linhaAutor: String? {
         guard estado == .provocacao, let a = autor, !a.isEmpty else { return nil }
-        if desatualizado { return a + " · não é a de hoje" }
-        return doCache ? a + " · offline" : a
+        if desatualizado { return a + " · " + t.autorNaoEHoje }
+        return doCache ? a + " · " + t.autorOffline : a
     }
 
     /// CTA por extenso (média/grande).
     var cta: String {
         switch estado {
-        case .provocacao:  return "Abrir para concluir o dia"
-        case .vazio:       return "Abrir o app"
-        case .semConexao:  return "Tentar no app"
-        case .virada:      return "Abrir para ler"
+        case .provocacao:  return t.ctaProvocacao
+        case .vazio:       return t.ctaVazio
+        case .semConexao:  return t.ctaSemConexao
+        case .virada:      return t.ctaVirada
         }
     }
 
     /// CTA curto (pequena).
-    var ctaCurto: String { "Abrir" }
+    var ctaCurto: String { t.ctaCurto }
 
     /// Título e subtítulo do bloco do símbolo (família grande).
     var tituloGrande: String {
         switch estado {
-        case .provocacao:  return "Provocação de hoje"
-        case .vazio:       return "Ainda sem provocação"
-        case .semConexao:  return "Sem conexão"
-        case .virada:      return "Novo dia"
+        case .provocacao:  return t.tituloProvocacao
+        case .vazio:       return t.tituloVazio
+        case .semConexao:  return t.semConexao
+        case .virada:      return t.novoDia
         }
     }
 
     var subtituloGrande: String {
         switch estado {
         case .provocacao:
-            if desatualizado { return "Sem conexão — esta não é a provocação de hoje." }
-            return doCache ? "Sem conexão · mostrando a última salva." : "Leia, reflita e registre uma ação concreta."
-        case .vazio:       return "Volte mais tarde ou abra o app."
-        case .semConexao:  return "Toque para tentar de novo no app."
-        case .virada:      return "O widget atualiza em instantes."
+            if desatualizado { return t.subtituloDesatualizado }
+            return doCache ? t.subtituloOffline : t.subtituloProvocacao
+        case .vazio:       return t.subtituloVazio
+        case .semConexao:  return t.subtituloSemConexao
+        case .virada:      return t.subtituloVirada
         }
     }
 
@@ -281,9 +471,9 @@ extension ProvocacaoEntry {
     var linhaInline: String {
         switch estado {
         case .provocacao:  return rotuloDia + " · " + perguntaCurta
-        case .vazio:       return "Diariamente · sem provocação hoje"
-        case .semConexao:  return "Diariamente · sem conexão"
-        case .virada:      return "Diariamente · novo dia"
+        case .vazio:       return t.inlineVazio
+        case .semConexao:  return t.inlineSemConexao
+        case .virada:      return t.inlineVirada
         }
     }
 }
@@ -296,13 +486,20 @@ enum WidgetAPI {
         case falha
     }
 
-    static let endpoint = URL(string: "https://app.diariamente.club/api/widget/today")
+    /// ?lang= sempre explícito, inclusive em pt: cada idioma tem a própria URL, e o
+    /// URLCache do aparelho e a borda do Railway (que guardam por URL) nunca servem a
+    /// resposta de um idioma para o outro.
+    static func endpoint(_ idioma: Idioma) -> URL? {
+        var c = URLComponents(string: "https://app.diariamente.club/api/widget/today")
+        c?.queryItems = [URLQueryItem(name: "lang", value: idioma.rawValue)]
+        return c?.url
+    }
 
     /// `ignorandoCache` serve para a retentativa: quando o widget está sem o conteúdo
     /// de hoje, consultar o cache local é inútil — é justamente ele que pode estar
     /// segurando a resposta errada.
-    static func buscar(ignorandoCache: Bool = false, _ completion: @escaping (Resultado) -> Void) {
-        guard let url = endpoint else { completion(.falha); return }
+    static func buscar(idioma: Idioma, ignorandoCache: Bool = false, _ completion: @escaping (Resultado) -> Void) {
+        guard let url = endpoint(idioma) else { completion(.falha); return }
         var req = URLRequest(url: url)
         // O servidor expira o Cache-Control exatamente na virada do dia em São Paulo,
         // então honrar o cache local é seguro no caminho normal e evita um round-trip
@@ -340,14 +537,25 @@ enum Carregador {
         return d == FusoSP.chaveDoDia(agora)
     }
 
-    static func carregar(agora: Date, ignorandoCache: Bool = false, completion: @escaping (ProvocacaoEntry) -> Void) {
-        WidgetAPI.buscar(ignorandoCache: ignorandoCache) { resultado in
+    /// O servidor informou um idioma diferente do pedido? Hoje ele não ecoa `lang`
+    /// (campo ausente = vale o contrato do ?lang=); se passar a ecoar, uma divergência
+    /// vira vazio em vez de exibir conteúdo na língua errada.
+    private static func idiomaDivergente(_ lang: String?, pedido: Idioma) -> Bool {
+        let l = (lang ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if l.isEmpty { return false }
+        return Idioma(codigo: l) != pedido
+    }
+
+    static func carregar(agora: Date, idioma: Idioma, ignorandoCache: Bool = false, completion: @escaping (ProvocacaoEntry) -> Void) {
+        WidgetAPI.buscar(idioma: idioma, ignorandoCache: ignorandoCache) { resultado in
             switch resultado {
             case .sucesso(let r):
                 let perguntaLimpa = (r.pergunta ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-                if r.vazio || perguntaLimpa.isEmpty {
-                    // Estado vazio honesto — não usa cache antigo para "preencher".
-                    completion(.vazio(date: agora))
+                if r.vazio || perguntaLimpa.isEmpty || idiomaDivergente(r.lang, pedido: idioma) {
+                    // Estado vazio honesto — não usa cache antigo para "preencher", e em
+                    // es isso é o normal enquanto não houver provocações em espanhol:
+                    // o widget diz "Pronto en tu idioma" e nunca cai para o português.
+                    completion(.vazio(date: agora, idioma: idioma))
                     return
                 }
                 let curtaLimpa = (r.perguntaCurta ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -357,25 +565,27 @@ enum Carregador {
                                            pergunta: perguntaLimpa,
                                            perguntaCurta: curtaLimpa.isEmpty ? perguntaLimpa : curtaLimpa,
                                            autor: autorLimpo.isEmpty ? nil : autorLimpo,
-                                           salvaEm: agora)
-                CacheProvocacao.salvar(item)
+                                           salvaEm: agora,
+                                           idioma: idioma.rawValue)
+                CacheProvocacao.salvar(item, idioma: idioma)
                 // Um 200 NÃO garante que o corpo é de hoje: o URLCache do aparelho ou a
                 // borda do Railway podem devolver uma resposta ainda "fresca" gravada
                 // antes da virada. Sem esta conferência o widget exibiria a provocação de
                 // ontem sem marca nenhuma — e, como a recarga é diária, ficaria assim até
                 // a meia-noite seguinte.
                 let doDia = ehDeHoje(r.data, agora: agora, vindoDoCache: false)
-                completion(.deItem(item, date: agora, doCache: false, desatualizado: !doDia))
+                completion(.deItem(item, date: agora, idioma: idioma, doCache: false, desatualizado: !doDia))
 
             case .falha:
                 // Erro de rede: último valor em cache, se houver — mas conferindo a data.
                 // Sem esta checagem o widget exibia a provocação de ONTEM com o rótulo
-                // "Dia N" de ontem, como se fosse a de hoje.
-                if let item = CacheProvocacao.ler() {
+                // "Dia N" de ontem, como se fosse a de hoje. O cache lido é o do idioma
+                // atual: sem cache em es, é "Sin conexión", nunca a última salva em pt.
+                if let item = CacheProvocacao.ler(idioma: idioma) {
                     let doDia = ehDeHoje(item.data, agora: agora, vindoDoCache: true)
-                    completion(.deItem(item, date: agora, doCache: true, desatualizado: !doDia))
+                    completion(.deItem(item, date: agora, idioma: idioma, doCache: true, desatualizado: !doDia))
                 } else {
-                    completion(.semConexao(date: agora))
+                    completion(.semConexao(date: agora, idioma: idioma))
                 }
             }
         }
@@ -388,16 +598,17 @@ struct ProvocacaoProvider: TimelineProvider {
     typealias Entry = ProvocacaoEntry
 
     func placeholder(in context: Context) -> ProvocacaoEntry {
-        .exemplo(date: Date())
+        .exemplo(date: Date(), idioma: .doAparelho)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (ProvocacaoEntry) -> Void) {
+        let idioma = Idioma.doAparelho
         if context.isPreview {
-            completion(.exemplo(date: Date()))
+            completion(.exemplo(date: Date(), idioma: idioma))
             return
         }
         let agora = Date()
-        Carregador.carregar(agora: agora) { completion($0) }
+        Carregador.carregar(agora: agora, idioma: idioma) { completion($0) }
     }
 
     /// Desvio estável por instalação, sorteado uma única vez e guardado.
@@ -419,12 +630,14 @@ struct ProvocacaoProvider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<ProvocacaoEntry>) -> Void) {
         let agora = Date()
+        // Lido uma vez por timeline: a entrada de agora e a da virada saem no mesmo idioma.
+        let idioma = Idioma.doAparelho
         // Uma recarga pedida logo após a virada tem que atravessar o cache local:
         // ele é justamente quem pode estar segurando a resposta do dia anterior.
         let logoAposAVirada = agora.timeIntervalSince(FusoSP.calendario.startOfDay(for: agora)) < 60 * 60
-        Carregador.carregar(agora: agora, ignorandoCache: logoAposAVirada) { entradaAgora in
+        Carregador.carregar(agora: agora, idioma: idioma, ignorandoCache: logoAposAVirada) { entradaAgora in
             let meiaNoite = FusoSP.proximaMeiaNoite(depoisDe: agora)
-            let entradaVirada = ProvocacaoEntry.virada(em: meiaNoite)
+            let entradaVirada = ProvocacaoEntry.virada(em: meiaNoite, idioma: idioma)
 
             // O conteúdo muda UMA vez por dia, à meia-noite de Brasília. A versão
             // anterior pedia recarga a cada 6h além da virada: 3 chamadas de rede
@@ -664,7 +877,7 @@ struct GrandeView: View {
         VStack(alignment: .leading, spacing: 12) {
             // Cabeçalho
             HStack(alignment: .center) {
-                Rotulo(texto: FusoSP.dataLonga(entry.date), cor: DiarCor.branco.opacity(0.5))
+                Rotulo(texto: FusoSP.dataLonga(entry.date, idioma: entry.idioma), cor: DiarCor.branco.opacity(0.5))
                 Spacer(minLength: 8)
                 Rotulo(texto: entry.rotuloDia, cor: DiarCor.teal)
             }
@@ -705,7 +918,7 @@ struct GrandeView: View {
                     }
                     Spacer(minLength: 8)
                     if entry.estado == .provocacao {
-                        Pilula(texto: "Ler", fundo: DiarCor.n900, corTexto: DiarCor.branco, altura: 24)
+                        Pilula(texto: entry.t.ctaLer, fundo: DiarCor.n900, corTexto: DiarCor.branco, altura: 24)
                     }
                 }
             }
@@ -848,13 +1061,18 @@ struct DiariamenteWidget: Widget {
         return lista
     }
 
+    // Nome e descrição da galeria de widgets no idioma do aparelho. String (e não
+    // literal) cai na sobrecarga StringProtocol: o texto vai como está, sem
+    // procurar tradução no bundle — quem traduz é o TextosWidget.
+    private static var textos: TextosWidget { Idioma.doAparelho.textos }
+
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: ProvocacaoProvider()) { entry in
             DiariamenteWidgetEntryView(entry: entry)
                 .widgetURL(URL(string: "https://app.diariamente.club")) // deep link: abre o app
         }
-        .configurationDisplayName("Provocação de Hoje")
-        .description("O símbolo, o dia e a provocação do Diariamente na sua tela.")
+        .configurationDisplayName(Self.textos.nomeWidget)
+        .description(Self.textos.descricaoWidget)
         .supportedFamilies(Self.familias)
     }
 }
