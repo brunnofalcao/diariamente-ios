@@ -117,6 +117,13 @@ enum Idioma: String {
     var localeDatas: Locale { Locale(identifier: self == .es ? "es" : "pt_BR") }
 
     var textos: TextosWidget { self == .es ? .es : .pt }
+
+    /// Já há provocações publicadas neste idioma? Hoje só em pt: em es a API responde
+    /// sempre vazio. Enquanto for false, o vazio é o estado normal do idioma, e não uma
+    /// falha — o widget não fica retentando a cada 30 min nem mostra na galeria uma
+    /// provocação que não vai aparecer. Quando as provocações em es forem publicadas:
+    /// devolver true para .es e trocar `descricaoWidget` em `TextosWidget.es`.
+    var temProvocacoesPublicadas: Bool { self == .pt }
 }
 
 /// Textos fixos do widget, um conjunto por idioma. Dicionário em código e não
@@ -244,7 +251,10 @@ struct TextosWidget {
         inlineSemConexao: "Diariamente · sin conexión",
         inlineVirada: "Diariamente · nuevo día",
         nomeWidget: "Provocación de Hoy",
-        descricaoWidget: "El símbolo, el día y la provocación de Diariamente en tu pantalla.",
+        // Sem provocações em es ainda, a galeria não pode prometer a provocação do dia.
+        // Volta para "El símbolo, el día y la provocación de Diariamente en tu pantalla."
+        // junto com `temProvocacoesPublicadas` quando o conteúdo em es for publicado.
+        descricaoWidget: "El símbolo y el día de Diariamente en tu pantalla. Las provocaciones en español llegan pronto.",
         exemploPergunta: "¿Qué estás posponiendo que cabría en diez minutos hoy?",
         formatoDataLonga: "EEEE, d 'de' MMMM"
     )
@@ -604,7 +614,11 @@ struct ProvocacaoProvider: TimelineProvider {
     func getSnapshot(in context: Context, completion: @escaping (ProvocacaoEntry) -> Void) {
         let idioma = Idioma.doAparelho
         if context.isPreview {
-            completion(.exemplo(date: Date(), idioma: idioma))
+            // A prévia da galeria mostra o que o widget vai de fato exibir: sem
+            // provocações publicadas no idioma, é o vazio honesto, não um exemplo.
+            completion(idioma.temProvocacoesPublicadas
+                       ? .exemplo(date: Date(), idioma: idioma)
+                       : .vazio(date: Date(), idioma: idioma))
             return
         }
         let agora = Date()
@@ -651,7 +665,13 @@ struct ProvocacaoProvider: TimelineProvider {
             // A condição é sobre o conteúdo estar certo, não sobre a origem: um cache
             // com a provocação de hoje não precisa de retentativa nenhuma, e uma
             // resposta 200 com o corpo de ontem precisa — era o inverso disso antes.
-            if entradaAgora.estado != .provocacao || entradaAgora.desatualizado {
+            // Mas o vazio de um idioma ainda sem provocações (es, hoje) é o estado
+            // normal, não falta pontual: retentar a cada 30 min gastaria ~48 recargas
+            // por dia do orçamento sem trazer nada — a resposta vazia fica no cache HTTP
+            // até o max-age do servidor, que tem teto de 6h. Por isso 6h ali.
+            if entradaAgora.estado == .vazio && !idioma.temProvocacoesPublicadas {
+                recarga = min(recarga, agora.addingTimeInterval(6 * 60 * 60))
+            } else if entradaAgora.estado != .provocacao || entradaAgora.desatualizado {
                 recarga = min(recarga, agora.addingTimeInterval(30 * 60))
             }
 
