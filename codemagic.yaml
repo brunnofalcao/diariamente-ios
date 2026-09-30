@@ -96,10 +96,16 @@ workflows:
           done
           echo "=== Assinatura por target ==="
           grep -nE 'PROVISIONING_PROFILE_SPECIFIER|DEVELOPMENT_TEAM|CODE_SIGN_STYLE|PRODUCT_BUNDLE_IDENTIFIER' ios/App/App.xcodeproj/project.pbxproj
-      - name: Definir versao (1.0.5) e build number
+      - name: Definir versao e build number
         script: |
           cd ios/App
-          agvtool new-marketing-version 1.0.5
+          # 1.0.5 JA ESTA PUBLICADA na App Store (desde 15/09/2026). O App Store
+          # Connect nao aceita criar uma versao de loja com numero igual ou menor que
+          # o ja liberado — um build 1.0.5 sobe para o TestFlight e trava na hora de
+          # virar release, e so se descobre isso depois de rodar o build inteiro.
+          # A versao vem da variavel de ambiente para parar de ser uma string escondida
+          # no meio do YAML, que ja foi esquecida uma vez.
+          agvtool new-marketing-version "${MARKETING_VERSION:-1.0.6}"
           agvtool new-version -all "$BUILD_NUMBER"
           echo "=== CONFERENCIA DE VERSAO (App e Widget devem ser iguais) ==="
           grep -o 'MARKETING_VERSION = [^;]*' App.xcodeproj/project.pbxproj | sort | uniq -c
