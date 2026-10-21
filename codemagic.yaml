@@ -96,10 +96,11 @@ workflows:
           done
           echo "=== Assinatura por target ==="
           grep -nE 'PROVISIONING_PROFILE_SPECIFIER|DEVELOPMENT_TEAM|CODE_SIGN_STYLE|PRODUCT_BUNDLE_IDENTIFIER' ios/App/App.xcodeproj/project.pbxproj
-      - name: Definir versao (1.0.5) e build number
+      - name: Definir versao (1.0.6) e build number
         script: |
           cd ios/App
-          agvtool new-marketing-version 1.0.5
+          # 1.0.5 ja esta publicada na App Store; 1.0.6 traz o plugin InstagramShare.
+          agvtool new-marketing-version 1.0.6
           agvtool new-version -all "$BUILD_NUMBER"
           echo "=== CONFERENCIA DE VERSAO (App e Widget devem ser iguais) ==="
           grep -o 'MARKETING_VERSION = [^;]*' App.xcodeproj/project.pbxproj | sort | uniq -c

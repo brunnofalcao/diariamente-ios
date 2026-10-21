@@ -12,7 +12,8 @@
     "@capacitor/push-notifications": "^7.0.0",
     "@capacitor/splash-screen": "^7.0.0",
     "@capacitor/app": "^7.0.0",
-    "@capacitor/haptics": "^7.0.0"
+    "@capacitor/haptics": "^7.0.0",
+    "diariamente-instagram-share": "file:./plugins/instagram-share"
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.0",
