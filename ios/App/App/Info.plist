@@ -44,7 +44,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>O Diariamente salva a imagem da pílula nas suas Fotos para você publicar no Instagram.</string>
+	<string>O Diariamente salva a imagem da pílula nas suas Fotos para você publicar ou guardar.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

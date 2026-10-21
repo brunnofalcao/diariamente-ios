@@ -2,7 +2,8 @@
 
 Plugin Capacitor 7 local (só iOS) do Diariamente. Leva o PNG da pílula direto ao
 Instagram (Stories pelo caminho oficial da Meta, Feed pelo atalho da biblioteca de
-Fotos) e abre a folha nativa de compartilhar para "Outros apps".
+Fotos) e abre a folha nativa de compartilhar quando o Instagram não abre. A linha
+"Outros apps" do site usa o `navigator.share` do WebKit e não passa pelo plugin.
 
 - JS: `window.Capacitor.Plugins.InstagramShare` com `disponivel`, `stories`, `feed`, `sistema`.
 - Nativo: `ios/Sources/InstagramSharePlugin/InstagramSharePlugin.swift`.
