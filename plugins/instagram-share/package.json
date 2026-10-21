@@ -1,0 +1,18 @@
+{
+  "name": "diariamente-instagram-share",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Plugin Capacitor local do Diariamente: leva a imagem da pilula direto ao Instagram (Stories e Feed) e abre a folha nativa de compartilhar do iOS",
+  "license": "UNLICENSED",
+  "author": "Diariamente",
+  "files": [
+    "ios/Sources/",
+    "DiariamenteInstagramShare.podspec",
+    "README.md"
+  ],
+  "capacitor": {
+    "ios": {
+      "src": "ios"
+    }
+  }
+}
