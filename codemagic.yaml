@@ -39,28 +39,47 @@ workflows:
           ruby -e "require 'xcodeproj'; puts 'xcodeproj ' + Xcodeproj::VERSION" 2>/dev/null \
             || gem install xcodeproj --no-document --user-install
           ruby scripts/add_widget_target.rb
-      - name: Forcar idioma pt-BR no binario (idioma principal do app)
+      - name: Forcar idioma pt-BR no binario (principal) e declarar espanhol
         script: |
           set -e
           PLIST="ios/App/App/Info.plist"
           PBX="ios/App/App.xcodeproj/project.pbxproj"
+          # Idiomas do binario: pt-BR e o principal; es entra para quem usa o iPhone em
+          # espanhol (America Latina e Espanha). O WKWebView so reporta navigator.language
+          # num idioma que o app declara: com es no binario, um iPhone em espanhol abre as
+          # telas iniciais do site em espanhol em qualquer fuso, e as folhas do sistema e os
+          # pedidos de permissao tambem saem em espanhol. Qualquer outro idioma sem
+          # localizacao (ingles etc.) cai no pt-BR, e o WKWebView diz portugues: ai o site
+          # decide as telas iniciais pelo fuso do aparelho (escolherIdiomaInicial no repo
+          # diariamente; fuso de pais de lingua espanhola, es). O iOS passa a mostrar
+          # Ajustes > Diariamente > Idioma preferido. Ingles continua fora do binario.
           # 1) Idioma principal do app = Portugues do Brasil (era 'en' por padrao do Capacitor)
           /usr/libexec/PlistBuddy -c "Set :CFBundleDevelopmentRegion pt-BR" "$PLIST" 2>/dev/null \
             || /usr/libexec/PlistBuddy -c "Add :CFBundleDevelopmentRegion string pt-BR" "$PLIST"
-          # 2) Localizacoes do bundle: Portugues apenas (remove English do binario)
+          # 2) Localizacoes do bundle: pt-BR, pt (Portugal, usa os textos do Info.plist) e es
           /usr/libexec/PlistBuddy -c "Delete :CFBundleLocalizations" "$PLIST" 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Add :CFBundleLocalizations array" "$PLIST"
           /usr/libexec/PlistBuddy -c "Add :CFBundleLocalizations:0 string pt-BR" "$PLIST"
           /usr/libexec/PlistBuddy -c "Add :CFBundleLocalizations:1 string pt" "$PLIST"
-          # 3) developmentRegion do projeto Xcode
-          sed -i '' 's/developmentRegion = en;/developmentRegion = "pt-BR";/g' "$PBX"
-          # 4) InfoPlist.strings minimo em pt-BR (localizacao real registrada)
-          mkdir -p "ios/App/App/pt-BR.lproj"
-          printf '"CFBundleDisplayName" = "Diariamente";\n"CFBundleName" = "Diariamente";\n' > "ios/App/App/pt-BR.lproj/InfoPlist.strings"
+          /usr/libexec/PlistBuddy -c "Add :CFBundleLocalizations:2 string es" "$PLIST"
+          # 3) InfoPlist.strings versionados no repo (nome do app e permissao das Fotos)
+          for loc in pt-BR es; do
+            f="ios/App/App/$loc.lproj/InfoPlist.strings"
+            test -f "$f" || { echo "ERRO: $f nao existe no repo"; exit 1; }
+            plutil -lint "$f"
+          done
+          # 4) Projeto Xcode: developmentRegion pt-BR, knownRegions (pt-BR, es, Base) e o
+          #    grupo de variantes InfoPlist.strings em Resources do App. Sem esse grupo as
+          #    pastas .lproj nao entram no .app (xcodeproj gem, idempotente)
+          ruby -e "require 'xcodeproj'" 2>/dev/null \
+            || gem install xcodeproj --no-document --user-install
+          ruby scripts/add_app_localizations.rb
           echo "=== CONFERENCIA DE IDIOMA ==="
           /usr/libexec/PlistBuddy -c "Print :CFBundleDevelopmentRegion" "$PLIST"
           /usr/libexec/PlistBuddy -c "Print :CFBundleLocalizations" "$PLIST"
           grep -n "developmentRegion" "$PBX" || true
+          grep -n -A5 "knownRegions" "$PBX" || true
+          grep -n "InfoPlist.strings" "$PBX" || true
       - name: Baixar icone oficial e gerar
         script: |
           mkdir -p assets
@@ -114,6 +133,34 @@ workflows:
       - name: Build do ipa
         script: |
           xcode-project build-ipa --workspace "ios/App/App.xcworkspace" --scheme "$XCODE_SCHEME"
+      - name: Conferir idiomas dentro do .ipa
+        script: |
+          set -e
+          # Confere no binario que vai para o TestFlight o que o passo de idiomas preparou:
+          # pt-BR principal, pt-BR e es no CFBundleLocalizations e as duas pastas .lproj
+          # dentro do .app. Se faltar algo, o build para aqui e nada sobe.
+          IPA=$(find build/ios/ipa -maxdepth 1 -name '*.ipa' | head -1)
+          test -n "$IPA" || { echo "ERRO: nenhum .ipa em build/ios/ipa"; exit 1; }
+          TMP=$(mktemp -d)
+          unzip -q "$IPA" -d "$TMP"
+          APP_DIR=$(find "$TMP/Payload" -maxdepth 1 -name '*.app' -type d | head -1)
+          test -n "$APP_DIR" || { echo "ERRO: nenhum .app dentro de $IPA"; exit 1; }
+          echo "=== IDIOMAS NO .ipa ($(basename "$IPA")) ==="
+          REGION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleDevelopmentRegion" "$APP_DIR/Info.plist")
+          echo "CFBundleDevelopmentRegion = $REGION"
+          [ "$REGION" = "pt-BR" ] || { echo "ERRO: idioma principal $REGION (esperado pt-BR)"; exit 1; }
+          LANGS=$(/usr/libexec/PlistBuddy -c "Print :CFBundleLocalizations" "$APP_DIR/Info.plist")
+          echo "CFBundleLocalizations = $LANGS"
+          for loc in pt-BR es; do
+            echo "$LANGS" | grep -qx "[[:space:]]*$loc" || { echo "ERRO: $loc fora do CFBundleLocalizations"; exit 1; }
+            f="$APP_DIR/$loc.lproj/InfoPlist.strings"
+            test -f "$f" || { echo "ERRO: $loc.lproj/InfoPlist.strings fora do .app"; ls -la "$APP_DIR"; exit 1; }
+            plutil -extract NSPhotoLibraryAddUsageDescription raw -o - "$f" >/dev/null \
+              || { echo "ERRO: $loc.lproj/InfoPlist.strings sem NSPhotoLibraryAddUsageDescription"; exit 1; }
+            echo "--- $loc.lproj/InfoPlist.strings"
+            plutil -p "$f"
+          done
+          rm -rf "$TMP"
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log

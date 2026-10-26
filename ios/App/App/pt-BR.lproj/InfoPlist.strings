@@ -1,0 +1,8 @@
+/*
+  Textos do Info.plist em portugues do Brasil (idioma principal do app).
+  Mesmo texto do Info.plist; vale tambem para qualquer idioma sem pasta .lproj.
+  Entra no .app pelo grupo de variantes InfoPlist.strings (scripts/add_app_localizations.rb).
+*/
+"CFBundleDisplayName" = "Diariamente";
+"CFBundleName" = "Diariamente";
+"NSPhotoLibraryAddUsageDescription" = "O Diariamente salva a imagem da pílula nas suas Fotos para você publicar ou guardar.";
