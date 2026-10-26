@@ -1,6 +1,6 @@
 require_relative '../../node_modules/@capacitor/ios/scripts/pods_helpers'
 
-platform :ios, '14.0'
+platform :ios, '15.0'
 use_frameworks!
 
 # workaround to avoid Xcode caching of Pods that requires
@@ -20,4 +20,15 @@ end
 
 post_install do |installer|
   assertDeploymentTarget(installer)
+  # Apple (ITMS-90068): a partir de abril de 2027 o alvo minimo e iOS 15. Os pods do
+  # Capacitor 7 declaram 14.0; aqui todos sobem para 15.0, para os frameworks embutidos
+  # no .app sairem com MinimumOSVersion 15.0 como o App (o Capacitor 8 ja faz isso no
+  # assertDeploymentTarget). O `npx cap sync` so reescreve o bloco capacitor_pods.
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      if config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'].to_f < 15.0
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+      end
+    end
+  end
 end

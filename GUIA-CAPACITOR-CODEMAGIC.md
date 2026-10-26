@@ -52,3 +52,19 @@ O App ID `club.diariamente.app` já tem **Push Notifications** ligado (você fez
 Esse fluxo é técnico. Se emperrar, um **freelancer iOS** faz isso numa tarde com este guia + os arquivos prontos. Pra um CEO, às vezes pagar 2–3h de um dev é o melhor uso do tempo. Mas dá pra você fazer — é mais cadastro do que código.
 
 Me manda o log se a primeira build falhar, que eu corrijo na hora.
+
+## Alvo mínimo: iOS 15 (a partir do build seguinte à 1.0.6)
+A Apple avisou (ITMS-90068) que, a partir de abril de 2027, o alvo mínimo é o iOS 15. O app passa
+de 14.0 para 15.0 em três lugares: `ios/App/Podfile` (`platform`), as quatro linhas de
+`IPHONEOS_DEPLOYMENT_TARGET` em `ios/App/App.xcodeproj/project.pbxproj` e o podspec do plugin
+`plugins/instagram-share`. O widget já é 16.0 (`scripts/add_widget_target.rb`) e não muda.
+- Os pods do Capacitor 7 declaram 14.0: o `post_install` do Podfile sobe todos para 15.0, para os
+  frameworks dentro do `.app` saírem com o mesmo mínimo do App. O `npx cap sync` não mexe nisso.
+- O passo "Conferir alvo minimo (iOS 15) dentro do .ipa" do `codemagic.yaml` lê o
+  `MinimumOSVersion` do App, do widget e de cada framework, e para o build se algum estiver abaixo
+  de 15.
+- Nenhum iPhone perde o app: o iOS 15 roda nos mesmos aparelhos do iOS 14. Quem ficou no iOS 14
+  continua com a última versão compatível.
+- Não vale para o build 22 (1.0.6), que já foi enviado. A versão do próximo build depende do
+  resultado da 1.0.6 na loja: aprovada, 1.0.7; recusada, 1.0.6 com build novo (passo "Definir
+  versao" do `codemagic.yaml`).

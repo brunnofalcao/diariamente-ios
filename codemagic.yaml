@@ -161,6 +161,31 @@ workflows:
             plutil -p "$f"
           done
           rm -rf "$TMP"
+      - name: Conferir alvo minimo (iOS 15) dentro do .ipa
+        script: |
+          set -e
+          # Apple (ITMS-90068): a partir de abril de 2027 o alvo minimo e iOS 15. Confere o
+          # MinimumOSVersion do App, do widget e de cada framework embutido. Abaixo de 15
+          # o build para aqui e nada sobe; chave ausente so gera aviso.
+          IPA=$(find build/ios/ipa -maxdepth 1 -name '*.ipa' | head -1)
+          test -n "$IPA" || { echo "ERRO: nenhum .ipa em build/ios/ipa"; exit 1; }
+          TMP=$(mktemp -d)
+          unzip -q "$IPA" -d "$TMP"
+          APP_DIR=$(find "$TMP/Payload" -maxdepth 1 -name '*.app' -type d | head -1)
+          test -n "$APP_DIR" || { echo "ERRO: nenhum .app dentro de $IPA"; exit 1; }
+          echo "=== MinimumOSVersion por bundle ==="
+          ABAIXO=0
+          for plist in "$APP_DIR/Info.plist" "$APP_DIR"/PlugIns/*.appex/Info.plist "$APP_DIR"/Frameworks/*.framework/Info.plist; do
+            [ -f "$plist" ] || continue
+            v=$(/usr/libexec/PlistBuddy -c "Print :MinimumOSVersion" "$plist" 2>/dev/null || true)
+            nome=${plist#"$APP_DIR"/}
+            if [ -z "$v" ]; then echo "AVISO: sem MinimumOSVersion  $nome"; continue; fi
+            echo "$v  $nome"
+            maj=${v%%.*}
+            case "$maj" in ''|*[!0-9]*) ABAIXO=1 ;; *) [ "$maj" -ge 15 ] || ABAIXO=1 ;; esac
+          done
+          rm -rf "$TMP"
+          [ "$ABAIXO" = 0 ] || { echo "ERRO: bundle com MinimumOSVersion abaixo de 15.0 (Podfile/pbxproj/podspec)"; exit 1; }
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
