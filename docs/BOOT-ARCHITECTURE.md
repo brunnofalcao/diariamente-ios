@@ -98,10 +98,19 @@ chegar a READY ali, e sem isso o usuário ficaria olhando a marca até o watchdo
 
 Reentrada: botão *Tentar novamente* e o evento `online` do sistema — sem polling.
 
-Idioma: `pt-BR` ou `es` pelo `navigator.language`, a mesma regra do site antes do
-login (a página roda em outra origem e não enxerga o idioma salvo pelo site). No
-iPhone em espanhol: "Sin conexión" e "Intentar de nuevo". Depende de o binário
-declarar `es` (ver "Espanhol no binário" em `docs/INSTAGRAM-DIRETO.md`).
+Idioma: `pt-BR` ou `es`, a mesma regra do site antes do login no app iOS
+(`escolherIdiomaInicial` no `public/index.html` do repo `diariamente`). A página roda
+em outra origem e não enxerga o idioma salvo pelo site. Um `es` na lista de idiomas do
+WKWebView vale (o binário declara `es`, ver "Espanhol no binário" em
+`docs/INSTAGRAM-DIRETO.md`); um `pt` não prova nada, porque o WKWebView diz português
+com o iPhone em português, em inglês ou em qualquer idioma que o binário não declara.
+Sem `es`, decide o fuso do aparelho pela lista `FUSOS_ES`, cópia da de
+`public/privacidade.html` do site: país de língua espanhola (América Latina e Espanha),
+"Sin conexión" e "Intentar de nuevo"; os demais, "Sem conexão" e "Tentar novamente".
+Assim, sem idioma salvo pelo site, esta tela e as telas de início do site falam o mesmo
+idioma (com idioma salvo, o site segue o salvo e esta tela segue a regra). Fuso novo
+de país de língua espanhola entra na lista do site e nas duas cópias desta página
+(`www/error.html` e `ios/App/App/public/error.html`), e só chega ao app com build novo.
 
 Camadas, da mais específica para a última linha de defesa:
 

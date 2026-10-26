@@ -47,9 +47,11 @@ workflows:
           # Idiomas do binario: pt-BR e o principal; es entra para quem usa o iPhone em
           # espanhol (America Latina e Espanha). O WKWebView so reporta navigator.language
           # num idioma que o app declara: com es no binario, um iPhone em espanhol abre as
-          # telas iniciais do site em espanhol (antes do login vale o idioma do aparelho), e
-          # as folhas do sistema e os pedidos de permissao tambem saem em espanhol. Qualquer
-          # outro idioma sem localizacao (ingles etc.) cai no pt-BR. O iOS passa a mostrar
+          # telas iniciais do site em espanhol em qualquer fuso, e as folhas do sistema e os
+          # pedidos de permissao tambem saem em espanhol. Qualquer outro idioma sem
+          # localizacao (ingles etc.) cai no pt-BR, e o WKWebView diz portugues: ai o site
+          # decide as telas iniciais pelo fuso do aparelho (escolherIdiomaInicial no repo
+          # diariamente; fuso de pais de lingua espanhola, es). O iOS passa a mostrar
           # Ajustes > Diariamente > Idioma preferido. Ingles continua fora do binario.
           # 1) Idioma principal do app = Portugues do Brasil (era 'en' por padrao do Capacitor)
           /usr/libexec/PlistBuddy -c "Set :CFBundleDevelopmentRegion pt-BR" "$PLIST" 2>/dev/null \

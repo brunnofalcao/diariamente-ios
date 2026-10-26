@@ -17,7 +17,7 @@
   Segue a SPLASH-DIARIAMENTE-001 no fundo e na cor, mas NÃO é uma splash: não tem
   marca, não anima e não some sozinha. É interface real, com saída.
 
-  Fala pt-BR ou es, pelo idioma do aparelho (ver o script no fim).
+  Fala pt-BR ou es, pela regra do site para o app iOS (ver o script no fim).
 -->
 <style>
   * { box-sizing: border-box; }
@@ -57,11 +57,15 @@
   var APP = 'https://app.diariamente.club';
   var btn = document.getElementById('retry');
 
-  // Idioma: a mesma regra do site antes do login (localeDoAparelho, repo diariamente):
-  // aparelho em espanhol → es; qualquer outro → pt-BR. Esta tela roda no bundle
-  // (capacitor://localhost), outra origem, e não enxerga o idioma salvo pelo site.
-  // O binário declara es, então o WKWebView reporta navigator.language em espanhol
-  // nos iPhones em espanhol. Troca antes de soltar a splash: o português não pisca.
+  // Idioma: a mesma regra do site antes do login no app iOS (escolherIdiomaInicial no
+  // public/index.html do repo diariamente). O primeiro es ou pt da lista de idiomas decide: es
+  // vale (o binário declara es, então um iPhone em espanhol diz es); pt não prova nada, porque o
+  // WKWebView diz português com o iPhone em português, em inglês ou em qualquer idioma que o
+  // binário não declara. Sem es, decide o fuso do aparelho: país de língua espanhola (América
+  // Latina e Espanha), es; os demais, pt-BR. FUSOS_ES é cópia da lista de public/privacidade.html
+  // do site (as estáticas e o mapa TZ_PAIS do app dizem o mesmo): fuso novo entra nos dois repos.
+  // Esta tela roda no bundle (capacitor://localhost), outra origem, e não enxerga o idioma salvo
+  // pelo site. Troca antes de soltar a splash: o português não pisca.
   var TEXTOS = {
     'pt-BR': {
       titulo: 'Sem conexão',
@@ -76,8 +80,20 @@
       conectando: 'Conectando…'
     }
   };
-  var nav = String(navigator.language || navigator.userLanguage || 'pt-BR').toLowerCase();
-  var LOCALE = nav.indexOf('es') === 0 ? 'es' : 'pt-BR';
+  var FUSOS_ES = /^(Europe\/Madrid|Atlantic\/Canary|Africa\/Ceuta|Pacific\/(Easter|Galapagos)|America\/(Mexico_City|Cancun|Merida|Monterrey|Matamoros|Chihuahua|Ciudad_Juarez|Ojinaga|Mazatlan|Bahia_Banderas|Hermosillo|Tijuana|Buenos_Aires|Cordoba|Mendoza|Jujuy|Catamarca|Argentina\/(Buenos_Aires|Cordoba|Mendoza|Salta|Tucuman|Jujuy|Catamarca|La_Rioja|San_Juan|San_Luis|Rio_Gallegos|Ushuaia)|Santiago|Punta_Arenas|Coyhaique|Bogota|Lima|La_Paz|Montevideo|Asuncion|Caracas|Guayaquil|Costa_Rica|Panama|Guatemala|El_Salvador|Tegucigalpa|Managua|Havana|Santo_Domingo|Puerto_Rico))$/;
+  function idiomaDoAparelho() {
+    var lista = [];
+    try { lista = Array.prototype.slice.call(navigator.languages || []); } catch (_) {}
+    lista.push(navigator.language || navigator.userLanguage);
+    for (var i = 0; i < lista.length; i++) {
+      var base = String(lista[i] || '').toLowerCase().split(/[-_]/)[0];
+      if (base === 'es') return 'es';
+      if (base === 'pt') break;
+    }
+    try { return FUSOS_ES.test(Intl.DateTimeFormat().resolvedOptions().timeZone || '') ? 'es' : 'pt-BR'; }
+    catch (_) { return 'pt-BR'; }
+  }
+  var LOCALE = idiomaDoAparelho();
   var T = TEXTOS[LOCALE];
   if (LOCALE !== 'pt-BR') {
     document.documentElement.lang = LOCALE;

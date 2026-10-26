@@ -113,9 +113,16 @@ guarda la imagen de la píldora en tus Fotos para que la publiques o la guardes.
 
 A pendência do pedido de permissão em espanhol foi resolvida junto com um pedido maior
 do dono: quem é da América Latina e baixa o app precisa ver as telas iniciais em
-espanhol. Antes do login o site escolhe o idioma pelo `navigator.language`, e o
-WKWebView só reporta um idioma que o app declara. Com o binário só em `pt-BR`/`pt`, um
-iPhone em espanhol abria as telas iniciais em português. A partir do build 22 da 1.0.6:
+espanhol. A maior parte disso é do site (repo `diariamente`: `escolherIdiomaInicial` e
+`TZ_PAIS` no `public/index.html`, regra completa no `docs/I18N.md` de lá). Antes do
+login, sem idioma salvo e sem `?lang=`, vale o primeiro `es` ou `pt` da lista de idiomas
+do navegador. No app iOS só um `es` vale: o WKWebView só reporta um idioma que o app
+declara, e diz português com o iPhone em português, em inglês ou em qualquer idioma que
+o binário não declara. Sem `es`, decide o fuso do aparelho: país de língua espanhola
+(México, Argentina, Chile, Colômbia, Espanha etc.), espanhol; os demais, português. Por
+isso, depois do deploy do site, o build 21 (binário só em `pt-BR`/`pt`) já abre as telas
+iniciais em espanhol nos fusos da América Latina e da Espanha. O build 22 da 1.0.6
+acrescenta o espanhol do próprio iPhone (vale em qualquer fuso) e os textos do sistema:
 
 | Item | Valor |
 |---|---|
@@ -124,23 +131,35 @@ iPhone em espanhol abria as telas iniciais em português. A partir do build 22 d
 | Textos do Info.plist por idioma | `ios/App/App/pt-BR.lproj/InfoPlist.strings` e `ios/App/App/es.lproj/InfoPlist.strings`, versionados (nome do app e permissão das Fotos) |
 | Projeto Xcode | `scripts/add_app_localizations.rb` (gem `xcodeproj`, idempotente): `developmentRegion` pt-BR, `knownRegions` (`pt-BR`, `es`, `Base`) e o grupo de variantes `InfoPlist.strings` em Resources do App. Sem esse grupo as pastas `.lproj` não entram no `.app` |
 | CI | o passo "Forcar idioma pt-BR no binario (principal) e declarar espanhol" grava o Info.plist e roda o script; "Conferir idiomas dentro do .ipa" para o build se o `.ipa` sair sem `pt-BR.lproj` ou `es.lproj` |
-| Tela sem conexão | `www/error.html` (bundle) fala espanhol no iPhone em espanhol: "Sin conexión" e "Intentar de nuevo" |
+| Tela sem conexão | `www/error.html` (bundle) segue a regra do site para o iOS (um `es` na lista vale; sem ele, o fuso): "Sin conexión" e "Intentar de nuevo" |
 
-Efeito:
+Efeito (com o site publicado):
 
 - iPhone em espanhol (de qualquer país): o app roda em espanhol. O `navigator.language`
   começa com `es`, o site abre as telas iniciais em espanhol, e as folhas do sistema
   (compartilhar, copiar e colar, alertas) e o pedido de permissão das Fotos saem em
   espanhol.
-- iPhone em português: como antes.
-- Qualquer outro idioma sem localização (inglês, francês etc.): cai no `pt-BR`, como
-  antes.
+- iPhone em português, ou em qualquer outro idioma sem localização (inglês, francês
+  etc.): o binário cai no `pt-BR`, como antes, e as folhas do sistema e o pedido das
+  Fotos saem em português. As telas iniciais seguem o fuso do aparelho: no fuso de um
+  país de língua espanhola, espanhol; nos demais, português.
+- Efeito aceito do fuso: um brasileiro com o iPhone em português que mora no México, na
+  Argentina ou na Espanha vê as telas iniciais em espanhol e, se ativar a conta ali, a
+  conta nasce em espanhol até ele trocar em Conta. Ver `docs/I18N.md` do repo
+  `diariamente`.
+- Lista de idiomas do iPhone com um idioma sem localização na frente (por exemplo
+  English, Español, Português): o iOS escolhe o primeiro da lista que o app tem, e o app
+  abre em espanhol, inclusive as telas iniciais.
 - O iOS passa a mostrar Ajustes > Diariamente > Idioma preferido, quando o iPhone tem
   mais de um idioma na lista de Ajustes > Geral > Idioma e Região. Dá para usar o
   Diariamente em espanhol num iPhone em português, e o contrário.
-- Depois do login vale o idioma da conta (`users.locale`), que o site guarda no
-  aparelho. Uma conta em português num iPhone em espanhol mostra o app em português e
-  as folhas do sistema em espanhol (o site não muda o idioma do sistema).
+- Depois do login vale o idioma da conta (`users.locale`). O site guarda esse idioma no
+  aparelho sempre que a conta abre (login, ativação ou sessão salva), e o guardado vence
+  o idioma do iPhone e o fuso até a pessoa sair da conta ou a sessão vencer (aí o login
+  segue a regra do aparelho, como as telas iniciais). Uma conta em português num
+  iPhone em espanhol mostra o app em português e as folhas do sistema em espanhol (o
+  site não muda o idioma do sistema). A tela sem conexão não enxerga o idioma guardado
+  (roda em outra origem) e segue a regra do iPhone e do fuso.
 - A lista de idiomas da página do app na loja vem do binário: passa a ter português e
   espanhol.
 
@@ -201,10 +220,13 @@ Rótulos como a pessoa vê na folha do site: "Instagram Stories", "Instagram Fee
    repetir nela fechar sem escolher e "Salvar Imagem". "Outros apps" abre a folha do
    WebKit.
 
-**Idioma (build 22 em diante).** O site guarda o idioma no aparelho quando a pessoa
-escolhe um ou entra na conta, e o guardado vence o do iPhone. Para ver as telas iniciais
-pelo idioma do iPhone, testar sem conta aberta: instalação nova (apagar o app e instalar
-de novo pelo TestFlight) ou depois de sair da conta.
+**Idioma.** Os passos 9 a 13, 15 e 16 pedem o build 22 em diante; o passo 14 vale já no
+build 21, com o site publicado. O site guarda o idioma no aparelho quando a pessoa
+escolhe um ou a conta abre, e o guardado vence o idioma do iPhone e o fuso. Para ver as
+telas iniciais pela regra do aparelho, testar sem conta aberta: instalação nova (apagar o
+app e instalar de novo pelo TestFlight) ou depois de sair da conta. O fuso vem de
+Ajustes > Geral > Data e Hora: para simular outro país, desligar "Ajustar
+Automaticamente" e escolher a cidade em Fuso Horário (no fim, ligar de novo).
 
 9. **iPhone em espanhol.** Ajustes > Geral > Idioma e Região > Español (México) como
    idioma principal do iPhone. Abrir o Diariamente sem conta: as telas iniciais aparecem
@@ -225,10 +247,20 @@ de novo pelo TestFlight) ou depois de sair da conta.
 12. **Conta em português num iPhone em espanhol.** Entrar com uma conta em português:
     depois do login o app segue a conta (português), e as folhas do sistema continuam
     em espanhol. É o esperado.
-13. **Outro idioma cai no português.** iPhone em inglês, sem conta: telas iniciais,
-    folhas do sistema e pedido das Fotos em português, como na 1.0.5.
-14. **Sem conexão.** iPhone em espanhol, modo avião, abrir o app: aparece "Sin conexión"
-    com o botão "Intentar de nuevo"; tirar do modo avião e o app entra sozinho. No
-    iPhone em português, "Sem conexão" e "Tentar novamente", como antes.
-15. **Nome do app.** Na tela de início do iPhone o nome continua "Diariamente" em
+13. **Outro idioma, no Brasil, cai no português.** iPhone em inglês, no fuso do Brasil
+    (Data e Hora no automático, no Brasil), sem conta: telas iniciais, folhas do sistema e
+    pedido das Fotos em português, como na 1.0.5.
+14. **Fuso do México com o iPhone em português ou inglês (o centro do pedido).** iPhone
+    em português, sem conta, Fuso Horário na Cidade do México: as telas iniciais aparecem
+    em espanhol, sem tocar em nada. Repetir com o iPhone em inglês: também em espanhol.
+    As folhas do sistema e o pedido das Fotos seguem em português (o binário não tem
+    inglês). Voltar o fuso para o Brasil, sem conta: telas iniciais em português. Com uma
+    conta em português aberta, o fuso não muda nada: o app segue a conta, inclusive depois
+    de fechar e abrir o app no fuso do México.
+15. **Sem conexão.** iPhone em espanhol, modo avião, abrir o app: aparece "Sin conexión"
+    com o botão "Intentar de nuevo"; tirar do modo avião e o app entra sozinho. Repetir
+    com o iPhone em português e o fuso da Cidade do México: também "Sin conexión" (a tela
+    segue a mesma regra das telas iniciais). No iPhone em português, no fuso do Brasil,
+    "Sem conexão" e "Tentar novamente", como antes.
+16. **Nome do app.** Na tela de início do iPhone o nome continua "Diariamente" em
     português, espanhol e inglês.
