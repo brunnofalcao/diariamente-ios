@@ -1,0 +1,8 @@
+/*
+  Textos do Info.plist em espanhol, para quem usa o iPhone em espanhol
+  (America Latina e Espanha) ou escolhe Español em Ajustes > Diariamente.
+  Entra no .app pelo grupo de variantes InfoPlist.strings (scripts/add_app_localizations.rb).
+*/
+"CFBundleDisplayName" = "Diariamente";
+"CFBundleName" = "Diariamente";
+"NSPhotoLibraryAddUsageDescription" = "Diariamente guarda la imagen de la píldora en tus Fotos para que la publiques o la guardes.";
