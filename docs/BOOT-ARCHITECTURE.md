@@ -98,6 +98,11 @@ chegar a READY ali, e sem isso o usuário ficaria olhando a marca até o watchdo
 
 Reentrada: botão *Tentar novamente* e o evento `online` do sistema — sem polling.
 
+Idioma: `pt-BR` ou `es` pelo `navigator.language`, a mesma regra do site antes do
+login (a página roda em outra origem e não enxerga o idioma salvo pelo site). No
+iPhone em espanhol: "Sin conexión" e "Intentar de nuevo". Depende de o binário
+declarar `es` (ver "Espanhol no binário" em `docs/INSTAGRAM-DIRETO.md`).
+
 Camadas, da mais específica para a última linha de defesa:
 
 | Situação | Quem trata | Resultado |

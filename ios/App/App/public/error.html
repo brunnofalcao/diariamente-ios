@@ -16,6 +16,8 @@
 
   Segue a SPLASH-DIARIAMENTE-001 no fundo e na cor, mas NÃO é uma splash: não tem
   marca, não anima e não some sozinha. É interface real, com saída.
+
+  Fala pt-BR ou es, pelo idioma do aparelho (ver o script no fim).
 -->
 <style>
   * { box-sizing: border-box; }
@@ -45,8 +47,8 @@
 </head>
 <body>
 <main>
-  <h1>Sem conexão</h1>
-  <p>Não foi possível abrir o Diariamente agora. Confira sua internet e tente de novo.</p>
+  <h1 id="titulo">Sem conexão</h1>
+  <p id="texto">Não foi possível abrir o Diariamente agora. Confira sua internet e tente de novo.</p>
   <button id="retry" type="button">Tentar novamente</button>
 </main>
 
@@ -54,6 +56,35 @@
 (function () {
   var APP = 'https://app.diariamente.club';
   var btn = document.getElementById('retry');
+
+  // Idioma: a mesma regra do site antes do login (localeDoAparelho, repo diariamente):
+  // aparelho em espanhol → es; qualquer outro → pt-BR. Esta tela roda no bundle
+  // (capacitor://localhost), outra origem, e não enxerga o idioma salvo pelo site.
+  // O binário declara es, então o WKWebView reporta navigator.language em espanhol
+  // nos iPhones em espanhol. Troca antes de soltar a splash: o português não pisca.
+  var TEXTOS = {
+    'pt-BR': {
+      titulo: 'Sem conexão',
+      texto: 'Não foi possível abrir o Diariamente agora. Confira sua internet e tente de novo.',
+      botao: 'Tentar novamente',
+      conectando: 'Conectando…'
+    },
+    es: {
+      titulo: 'Sin conexión',
+      texto: 'No se pudo abrir Diariamente en este momento. Revisa tu conexión e intenta de nuevo.',
+      botao: 'Intentar de nuevo',
+      conectando: 'Conectando…'
+    }
+  };
+  var nav = String(navigator.language || navigator.userLanguage || 'pt-BR').toLowerCase();
+  var LOCALE = nav.indexOf('es') === 0 ? 'es' : 'pt-BR';
+  var T = TEXTOS[LOCALE];
+  if (LOCALE !== 'pt-BR') {
+    document.documentElement.lang = LOCALE;
+    document.getElementById('titulo').textContent = T.titulo;
+    document.getElementById('texto').textContent = T.texto;
+    btn.textContent = T.botao;
+  }
 
   // A splash nativa está segurada esperando o app chegar a READY — coisa que este
   // documento nunca vai fazer. Solta ela agora, senão o usuário fica olhando a
@@ -65,7 +96,7 @@
 
   function retry() {
     btn.disabled = true;
-    btn.textContent = 'Conectando…';
+    btn.textContent = T.conectando;
     window.location.replace(APP);
   }
 
