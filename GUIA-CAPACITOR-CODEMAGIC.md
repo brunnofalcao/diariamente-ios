@@ -63,8 +63,9 @@ de 14.0 para 15.0 em três lugares: `ios/App/Podfile` (`platform`), as quatro li
 - O passo "Conferir alvo minimo (iOS 15) dentro do .ipa" do `codemagic.yaml` lê o
   `MinimumOSVersion` do App, do widget e de cada framework, e para o build se algum estiver abaixo
   de 15.
-- Nenhum iPhone perde o app: o iOS 15 roda nos mesmos aparelhos do iOS 14. Quem ficou no iOS 14
-  continua com a última versão compatível.
+- Nenhum aparelho deixa de ser compatível: o iOS 15 roda nos mesmos iPhones do iOS 14. Quem
+  está no iOS 14 fica na versão instalada (o app continua funcionando) e só recebe a 1.0.7 depois
+  de atualizar o iOS.
 - Não vale para o build 22 (1.0.6), que já foi enviado. A versão do próximo build depende do
   resultado da 1.0.6 na loja: aprovada, 1.0.7; recusada, 1.0.6 com build novo (passo "Definir
   versao" do `codemagic.yaml`).
