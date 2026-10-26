@@ -107,7 +107,7 @@ Info.plist: `LSApplicationQueriesSchemes` (`instagram-stories`, `instagram`) e
 pedido aparece quando a pessoa toca "Salvar Imagem" numa folha de compartilhar, onde
 o Instagram não tem nada a ver: "O Diariamente salva a imagem da pílula nas suas Fotos
 para você publicar ou guardar." Em espanhol (`es.lproj/InfoPlist.strings`): "Diariamente
-guarda la imagen de la píldora en tus Fotos para que la publiques o la guardes."
+guarda la imagen de la píldora en tus Fotos para que la publiques o la conserves."
 
 ### Espanhol no binário (decisão do dono, 26/10/2026)
 
@@ -241,7 +241,7 @@ Automaticamente" e escolher a cidade em Fuso Horário (no fim, ligar de novo).
     instalação nova (permissão das Fotos ainda não pedida), entrar na conta e escolher
     "Instagram Feed (retrato)" ("Instagram Feed (vertical)" se a conta for em
     espanhol): o pedido diz "Diariamente guarda la imagen de la píldora en tus Fotos
-    para que la publiques o la guardes." Esse texto segue o idioma do iPhone (ou o
+    para que la publiques o la conserves." Esse texto segue o idioma do iPhone (ou o
     escolhido em Ajustes > Diariamente), não o da conta. A folha de "Outros apps"
     ("Otras apps") e o menu de copiar e colar também aparecem em espanhol.
 12. **Conta em português num iPhone em espanhol.** Entrar com uma conta em português:
