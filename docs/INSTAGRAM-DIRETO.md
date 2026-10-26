@@ -106,27 +106,50 @@ Info.plist: `LSApplicationQueriesSchemes` (`instagram-stories`, `instagram`) e
 `NSPhotoLibraryAddUsageDescription`. O texto da permissão é neutro, porque o mesmo
 pedido aparece quando a pessoa toca "Salvar Imagem" numa folha de compartilhar, onde
 o Instagram não tem nada a ver: "O Diariamente salva a imagem da pílula nas suas Fotos
-para você publicar ou guardar."
+para você publicar ou guardar." Em espanhol (`es.lproj/InfoPlist.strings`): "Diariamente
+guarda la imagen de la píldora en tus Fotos para que la publiques o la guardes."
 
-**Pendência para o dono decidir antes da 1.0.6: o pedido de permissão em espanhol.**
-Hoje ele existe só em português, e quem usa o app em espanhol vê o aviso das Fotos em
-português (a descrição do Feed em espanhol já fala em "Guarda la imagen en tus Fotos").
-O binário declara só `pt-BR`/`pt` de propósito (passo "Forcar idioma pt-BR" do
-`codemagic.yaml`), e o `pt-BR.lproj/InfoPlist.strings` que esse passo gera nem entra no
-`project.pbxproj`. Para ter espanhol:
+### Espanhol no binário (decisão do dono, 26/10/2026)
 
-1. Criar `ios/App/App/es.lproj/InfoPlist.strings` com
-   `"NSPhotoLibraryAddUsageDescription" = "Diariamente guarda la imagen de la píldora en tus Fotos para que la publiques o la conserves.";`
-   e registrá-lo nos recursos do target App (grupo de variantes `InfoPlist.strings` no
-   `project.pbxproj`).
-2. Acrescentar `es` ao `knownRegions` do projeto e ao `CFBundleLocalizations` do
-   Info.plist e do passo "Forcar idioma" do `codemagic.yaml`, que reescreve essa lista.
+A pendência do pedido de permissão em espanhol foi resolvida junto com um pedido maior
+do dono: quem é da América Latina e baixa o app precisa ver as telas iniciais em
+espanhol. Antes do login o site escolhe o idioma pelo `navigator.language`, e o
+WKWebView só reporta um idioma que o app declara. Com o binário só em `pt-BR`/`pt`, um
+iPhone em espanhol abria as telas iniciais em português. A partir do build 22 da 1.0.6:
 
-Efeito colateral: com `es` declarado, os textos do sistema dentro do app (folha de
-compartilhar, alertas, menus de copiar e colar) passam para espanhol nos aparelhos em
-espanhol. Por isso é decisão do dono; até lá, fica só em português.
+| Item | Valor |
+|---|---|
+| Idioma principal | `pt-BR` (`CFBundleDevelopmentRegion` no Info.plist e `developmentRegion` no projeto) |
+| `CFBundleLocalizations` | `pt-BR`, `pt` e `es` (inglês continua fora) |
+| Textos do Info.plist por idioma | `ios/App/App/pt-BR.lproj/InfoPlist.strings` e `ios/App/App/es.lproj/InfoPlist.strings`, versionados (nome do app e permissão das Fotos) |
+| Projeto Xcode | `scripts/add_app_localizations.rb` (gem `xcodeproj`, idempotente): `developmentRegion` pt-BR, `knownRegions` (`pt-BR`, `es`, `Base`) e o grupo de variantes `InfoPlist.strings` em Resources do App. Sem esse grupo as pastas `.lproj` não entram no `.app` |
+| CI | o passo "Forcar idioma pt-BR no binario (principal) e declarar espanhol" grava o Info.plist e roda o script; "Conferir idiomas dentro do .ipa" para o build se o `.ipa` sair sem `pt-BR.lproj` ou `es.lproj` |
+| Tela sem conexão | `www/error.html` (bundle) fala espanhol no iPhone em espanhol: "Sin conexión" e "Intentar de nuevo" |
 
-## Roteiro de teste no TestFlight (build 1.0.6)
+Efeito:
+
+- iPhone em espanhol (de qualquer país): o app roda em espanhol. O `navigator.language`
+  começa com `es`, o site abre as telas iniciais em espanhol, e as folhas do sistema
+  (compartilhar, copiar e colar, alertas) e o pedido de permissão das Fotos saem em
+  espanhol.
+- iPhone em português: como antes.
+- Qualquer outro idioma sem localização (inglês, francês etc.): cai no `pt-BR`, como
+  antes.
+- O iOS passa a mostrar Ajustes > Diariamente > Idioma preferido, quando o iPhone tem
+  mais de um idioma na lista de Ajustes > Geral > Idioma e Região. Dá para usar o
+  Diariamente em espanhol num iPhone em português, e o contrário.
+- Depois do login vale o idioma da conta (`users.locale`), que o site guarda no
+  aparelho. Uma conta em português num iPhone em espanhol mostra o app em português e
+  as folhas do sistema em espanhol (o site não muda o idioma do sistema).
+- A lista de idiomas da página do app na loja vem do binário: passa a ter português e
+  espanhol.
+
+Para acrescentar outro idioma no futuro: criar `ios/App/App/<idioma>.lproj/InfoPlist.strings`
+e pôr o idioma em `LOCALES` no script, no `CFBundleLocalizations` (Info.plist e passo do
+`codemagic.yaml`) e nos laços `for loc in` dos dois passos de idioma do `codemagic.yaml`.
+O site também precisa falar o idioma: hoje ele só tem `pt-BR` e `es`.
+
+## Roteiro de teste no TestFlight (1.0.6)
 
 Rótulos como a pessoa vê na folha do site: "Instagram Stories", "Instagram Feed
 (retrato)", "Instagram Feed (quadrado)" e "Outros apps". A folha de antes tem "Stories",
@@ -149,10 +172,11 @@ Rótulos como a pessoa vê na folha do site: "Instagram Stories", "Instagram Fee
    colar do Diariamente. "Permitir": a imagem aparece. "Não permitir": anotar o que
    o Instagram mostra e conferir que voltar ao Diariamente não trava a tela.
 4. **Instagram Feed (retrato), permissão aceita.** Aparece o pedido "Adicionar às
-   Fotos" com o texto em português; aceitar. A imagem vai para as Fotos (em Fotos, o
-   painel de informações da imagem mostra PNG) e o Instagram abre no fluxo de nova
-   publicação com ela. Se abrir sem a foto, conferir que ela é a primeira da galeria do
-   Instagram e anotar a versão do Instagram.
+   Fotos" com o texto em português (no iPhone em espanhol, em espanhol: passo 11);
+   aceitar. A imagem vai para as Fotos (em Fotos, o painel de informações da imagem
+   mostra PNG) e o Instagram abre no fluxo de nova publicação com ela. Se abrir sem a
+   foto, conferir que ela é a primeira da galeria do Instagram e anotar a versão do
+   Instagram.
 5. **Instagram Feed (quadrado).** Como no passo 4, com a imagem 1:1 (o pedido de
    permissão não aparece de novo).
 6. **Outros apps.** É a folha do iOS aberta pelo site (`navigator.share` do WebKit), não
@@ -176,3 +200,35 @@ Rótulos como a pessoa vê na folha do site: "Instagram Stories", "Instagram Fee
    nativa do passo 7 abre como popover no centro da tela, sem seta e sem travar;
    repetir nela fechar sem escolher e "Salvar Imagem". "Outros apps" abre a folha do
    WebKit.
+
+**Idioma (build 22 em diante).** O site guarda o idioma no aparelho quando a pessoa
+escolhe um ou entra na conta, e o guardado vence o do iPhone. Para ver as telas iniciais
+pelo idioma do iPhone, testar sem conta aberta: instalação nova (apagar o app e instalar
+de novo pelo TestFlight) ou depois de sair da conta.
+
+9. **iPhone em espanhol.** Ajustes > Geral > Idioma e Região > Español (México) como
+   idioma principal do iPhone. Abrir o Diariamente sem conta: as telas iniciais aparecem
+   em espanhol, sem tocar em nada. Se der, repetir com Español (España) e com Español
+   (Latinoamérica).
+10. **Idioma só do Diariamente.** iPhone em português, com Español acrescentado na lista
+    de Ajustes > Geral > Idioma e Região (sem trocar o principal; sem um segundo idioma
+    na lista o iOS não mostra a opção). Ajustes > Diariamente > Idioma preferido >
+    Español e abrir o app: telas iniciais em espanhol. Voltar para Português: telas
+    iniciais em português.
+11. **Textos do sistema em espanhol.** Com o app em espanhol (passo 9 ou 10), numa
+    instalação nova (permissão das Fotos ainda não pedida), entrar na conta e escolher
+    "Instagram Feed (retrato)" ("Instagram Feed (vertical)" se a conta for em
+    espanhol): o pedido diz "Diariamente guarda la imagen de la píldora en tus Fotos
+    para que la publiques o la guardes." Esse texto segue o idioma do iPhone (ou o
+    escolhido em Ajustes > Diariamente), não o da conta. A folha de "Outros apps"
+    ("Otras apps") e o menu de copiar e colar também aparecem em espanhol.
+12. **Conta em português num iPhone em espanhol.** Entrar com uma conta em português:
+    depois do login o app segue a conta (português), e as folhas do sistema continuam
+    em espanhol. É o esperado.
+13. **Outro idioma cai no português.** iPhone em inglês, sem conta: telas iniciais,
+    folhas do sistema e pedido das Fotos em português, como na 1.0.5.
+14. **Sem conexão.** iPhone em espanhol, modo avião, abrir o app: aparece "Sin conexión"
+    com o botão "Intentar de nuevo"; tirar do modo avião e o app entra sozinho. No
+    iPhone em português, "Sem conexão" e "Tentar novamente", como antes.
+15. **Nome do app.** Na tela de início do iPhone o nome continua "Diariamente" em
+    português, espanhol e inglês.
